@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"select-course/demo1/src/constant/config"
+	"select-course/demo1/src/models"
 	"time"
 )
 
@@ -41,6 +42,14 @@ func init() {
 		SkipDefaultTransaction: true,
 	})
 	if err != nil {
+		panic(err)
+	}
+	if err := db.AutoMigrate(
+		models.Course{},
+		models.User{},
+		models.Schedule{},
+		models.CourseCategory{},
+	); err != nil {
 		panic(err)
 	}
 	Client, err = db.DB()
