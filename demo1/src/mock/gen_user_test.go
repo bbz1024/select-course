@@ -12,7 +12,7 @@ func TestInsertUsers(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		users = append(users, models.User{
 			BaseModel: models.BaseModel{ID: uint(i)},
-			UserName:  "user" + strconv.Itoa(i),
+			UserName:  "users" + strconv.Itoa(i),
 			Password:  "password" + strconv.Itoa(i),
 		})
 	}

@@ -45,6 +45,7 @@ func init() {
 	if err := db.AutoMigrate(
 		models.Course{},
 		models.User{},
+		models.UserCourse{},
 		models.CourseCategory{},
 	); err != nil {
 		panic(err)

@@ -23,6 +23,7 @@ func TestInsertCourse(t *testing.T) {
 			CategoryID: uint(rand.Intn(5) + 1),
 			Week:       uint8(rand.Intn(5) + 1),
 			Duration:   duration[rand.Intn(3)],
+			Capacity:   uint(rand.Intn(20) + 1),
 		})
 	}
 	database.Client.Create(&course)

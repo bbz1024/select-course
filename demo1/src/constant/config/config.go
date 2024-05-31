@@ -9,6 +9,9 @@ import (
 var EnvCfg envConfig
 
 type envConfig struct {
+	// project
+	ServerPort  string `env:"ServerPort" envDefault:"8080"`
+	ProjectMode string `env:"ProjectMode" envDefault:"dev"`
 	// logger
 	LoggerLevel string `env:"LoggerLevel" envDefault:"DEBUG"`
 
@@ -23,7 +26,8 @@ type envConfig struct {
 	MysqlMaxOpenConns int    `env:"MysqlMaxOpenConns" envDefault:"100"`
 }
 
-var path = "../../.env.dev"
+// var path = "../../.env.dev"
+var path = "demo1/.env.dev"
 
 // ../../.env.dev
 func init() {

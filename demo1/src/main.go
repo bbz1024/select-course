@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"select-course/demo1/src/storage/database"
-	"select-course/demo1/src/utils/logger"
+	"select-course/demo1/src/constant/config"
+	"select-course/demo1/src/web/router"
 )
 
 func main() {
-	err := database.Client.Ping()
-	fmt.Println(err)
-	logger.Logger.Info("ok")
+	r := router.InitApiRouter()
+	err := r.Run(":" + config.EnvCfg.ServerPort)
+	if err != nil {
+		panic(err)
+	}
 }
