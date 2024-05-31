@@ -1,7 +1,6 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -15,10 +14,9 @@ import (
 	"time"
 )
 
-var Client *sql.DB
+var Client *gorm.DB
 
 func init() {
-	fmt.Println(config.EnvCfg.MySqlHOST)
 	db, err := gorm.Open(mysql.New(mysql.Config{
 		DSN: fmt.Sprintf(
 			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
@@ -51,11 +49,11 @@ func init() {
 	); err != nil {
 		panic(err)
 	}
-	Client, err = db.DB()
-
-	Client.SetMaxIdleConns(config.EnvCfg.MysqlMaxIdleConns) // 设置连接池，空闲
-	Client.SetMaxOpenConns(config.EnvCfg.MysqlMaxOpenConns) // 打开
-	Client.SetConnMaxLifetime(time.Second * 30)
+	Client = db
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxIdleConns(config.EnvCfg.MysqlMaxIdleConns) // 设置连接池，空闲
+	sqlDB.SetMaxOpenConns(config.EnvCfg.MysqlMaxOpenConns) // 打开
+	sqlDB.SetConnMaxLifetime(time.Second * 30)
 
 }
 func getGormLogger() logger.Interface {

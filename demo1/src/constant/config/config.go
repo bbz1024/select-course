@@ -23,8 +23,12 @@ type envConfig struct {
 	MysqlMaxOpenConns int    `env:"MysqlMaxOpenConns" envDefault:"100"`
 }
 
+var path = "../../.env.dev"
+
+// ../../.env.dev
 func init() {
-	if err := godotenv.Load("demo1/.env.dev"); err != nil {
+
+	if err := godotenv.Load(path); err != nil {
 		log.Fatalln("read .env file failed")
 	}
 	EnvCfg = envConfig{}
