@@ -10,9 +10,6 @@ import (
 
 func TestInsertCourse(t *testing.T) {
 	// 星期一 上午 08:10 ~ 11:50 | 星期二 下午 14:10 ~ 16:50 | 星期三 晚上 18:50 ~ 21:20
-	duration := []string{
-		"上午 08:10 ~ 11:50", "下午 14:10 ~ 16:50", "晚上 18:50 ~ 21:20",
-	}
 	var course []models.Course
 	for i := 1; i < 11; i++ {
 		course = append(course, models.Course{
@@ -21,12 +18,28 @@ func TestInsertCourse(t *testing.T) {
 			},
 			Title:      fmt.Sprintf("课程%d", i),
 			CategoryID: uint(rand.Intn(5) + 1),
-			Week:       uint8(rand.Intn(5) + 1),
-			Duration:   duration[rand.Intn(3)],
-			Capacity:   uint(rand.Intn(20) + 1),
+			ScheduleID: uint(rand.Intn(15) + 1),
+			Capacity:   uint(rand.Intn(10) + 1),
 		})
 	}
 	database.Client.Create(&course)
+
+}
+func TestInsertSchedule(t *testing.T) {
+	var schedule []models.Schedule
+	week := 5
+	duration := 3
+	for i := 1; i <= week; i++ {
+		for j := 1; j <= duration; j++ {
+			schedule = append(schedule, models.Schedule{
+				Week:     models.Week(i),
+				Duration: models.Duration(j),
+			})
+		}
+	}
+	fmt.Println(schedule)
+	database.Client.Create(&schedule)
+
 }
 func TestInsertCourseCategory(t *testing.T) {
 	var courseCategory []models.CourseCategory

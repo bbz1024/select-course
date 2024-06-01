@@ -2,6 +2,25 @@ package models
 
 import "time"
 
+type Duration uint8
+type Week uint8
+
+const (
+	_                  = iota
+	Morning   Duration = iota // 上午 08:10 ~ 11:50
+	AfterNoon                 // 下午 14:10 ~ 16:50
+	Evening                   // 晚上 18:50 ~ 21:20
+)
+const (
+	// 上课周
+	_ Week = iota
+	Mon
+	Tue
+	Wed
+	Thu
+	Fri
+)
+
 // CourseCategory 课程种类
 type CourseCategory struct {
 	BaseModel
@@ -17,11 +36,19 @@ type Course struct {
 	Category   *CourseCategory `json:"category" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程分类"`
 
 	// 上课周 1 ~ 5
-	Week uint8 `json:"week" gorm:"type:int;"`
-	// 例如：  上午 08:10 ~ 11:50 |  下午 14:10 ~ 16:50 |  晚上 18:50 ~ 21:20
-	Duration string `json:"duration" gorm:"type:varchar(32);not null;comment:上课时间段"`
+	//	上课时间段 早中晚
+	ScheduleID uint      `json:"ScheduleID" gorm:"not null;comment:分类ID"`
+	Schedule   *Schedule `json:"schedule" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程时间"`
 	// 容纳人数
 	Capacity uint `json:"capacity" gorm:"type:int;not null;comment:容纳人数"`
+}
+
+type Schedule struct {
+	BaseModel
+	// 上下午阶段
+	Duration Duration `json:"duration" gorm:"type:int;"`
+	// 上课周 周一到周五
+	Week Week `json:"week" gorm:"type:int;"`
 }
 
 // UserCourse 用户选课关系表

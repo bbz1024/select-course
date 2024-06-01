@@ -46,6 +46,7 @@ func init() {
 		models.Course{},
 		models.User{},
 		models.UserCourse{},
+		models.Schedule{},
 		models.CourseCategory{},
 	); err != nil {
 		panic(err)
