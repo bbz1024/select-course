@@ -2,7 +2,6 @@ package course
 
 import (
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"select-course/demo1/src/constant/code"
@@ -11,6 +10,7 @@ import (
 	"select-course/demo1/src/storage/database"
 	"select-course/demo1/src/utils/logger"
 	"select-course/demo1/src/utils/resp"
+	"sync"
 )
 
 func GetCourseList(ctx *gin.Context) {
@@ -21,6 +21,9 @@ func GetCourseList(ctx *gin.Context) {
 	}
 	resp.Success(ctx, courseList)
 }
+
+var CourseSelect sync.Mutex
+
 func SelectCourse(ctx *gin.Context) {
 	// 1. 校验参数
 	var req request.SelectCourseReq
@@ -29,6 +32,9 @@ func SelectCourse(ctx *gin.Context) {
 		resp.ParamErr(ctx)
 		return
 	}
+	// 加全局锁
+	CourseSelect.Lock()
+	defer CourseSelect.Unlock()
 
 	// 2. 校验操作
 	// 2.1 课程是否存在
@@ -51,7 +57,6 @@ func SelectCourse(ctx *gin.Context) {
 		resp.DBError(ctx)
 		return
 	}
-	fmt.Println(userCourses)
 	for _, userCourse := range userCourses {
 		if userCourse.CourseID == uint(req.CourseID) {
 			logger.Logger.Info("用户已经选择该门课程")
@@ -85,4 +90,14 @@ func SelectCourse(ctx *gin.Context) {
 		return
 	}
 	resp.Success(ctx, nil)
+
+	/*
+		以上存在并发安全问题，由于查询，扣减与创建选课记录并不是一气呵成的（原子性），不能保证在校验过程中，有其他的线程进行对课程的库存进行扣将
+		方法1：
+			通过加锁操作使可能存在的并发进行串行化
+		方法2：
+			通过mysql提供的事务机制
+		细粒度对比：方法1 > 方法2
+	*/
+
 }
