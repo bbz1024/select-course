@@ -1,7 +1,9 @@
 package users
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"select-course/demo1/src/constant/code"
 	"select-course/demo1/src/models"
 	"select-course/demo1/src/models/request"
@@ -20,18 +22,17 @@ func GetUserHandler(ctx *gin.Context) {
 	}
 	//2. 判断用户是否存在
 	var user models.User
-	if err := database.Client.Where(
-		"user_name = ? and password = ?", req.UserName, req.Password,
-	).Find(&user).Error; err != nil {
+	// First 查询不存在时会直接抛出异常，Find查询并不会，查询不到时返回的是空结果
+	if err := database.Client.First(&user, req.UserID).Error; err != nil {
+		// 不存在
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
+			return
+		}
+		logger.Logger.Error("查询用户失败", err)
 		resp.DBError(ctx)
-		return
-	}
-	// 不存在
-	if user.ID == 0 {
-		resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
 		return
 	}
 	//3. 返回用户信息
 	resp.Success(ctx, user)
-
 }
