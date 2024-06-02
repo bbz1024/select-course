@@ -16,6 +16,7 @@ const (
 	CourseFull         = 2002
 	CourseSelected     = 2003
 	CourseTimeConflict = 2004
+	CourseNotSelected  = 2005
 
 	// mysql
 
@@ -39,6 +40,7 @@ const (
 	CourseSelectedMsg     = "用户已经选择该门课程"
 	CourseTimeConflictMsg = "课程上课时间存在冲突"
 	CourseFullMsg         = "课程已满"
+	CourseNotSelectedMsg  = "用户未选择该门课程"
 
 	// db
 

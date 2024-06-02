@@ -33,8 +33,9 @@ func InitApiRouter() *gin.Engine {
 	coursePath := v1.Group("course")
 	{
 		coursePath.GET("list/", course.GetCourseList)
-		//coursePath.GET("my/", nil)
+		coursePath.GET("my/", course.MyCourseList)
 		coursePath.POST("select/", course.SelectCourse)
+		coursePath.POST("back/", course.BackCourse)
 	}
 
 	return router
