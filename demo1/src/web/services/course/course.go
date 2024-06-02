@@ -60,8 +60,8 @@ func SelectCourse(ctx *gin.Context) {
 			}
 			return err
 		}
-		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration)
 		// 2.3 检查用户是否已选该课程或时间冲突
+		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration) - 1
 		if user.Flag.TestBit(offset) {
 			logger.Logger.WithContext(ctx).Info("用户已选该课程或时间冲突")
 			resp.Fail(ctx, code.ParamErr, code.CourseTimeConflict, code.CourseTimeConflictMsg)
@@ -155,7 +155,7 @@ func BackCourse(ctx *gin.Context) {
 			return err
 		}
 		// 2.6 更新用户选课记录
-		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration)
+		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration) - 1
 		user.Flag.ClearBit(offset)
 		if err := tx.Save(&user).Error; err != nil {
 			logger.Logger.WithContext(ctx).Info("更新用户选课记录失败", err)
