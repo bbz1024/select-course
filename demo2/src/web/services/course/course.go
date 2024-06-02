@@ -3,16 +3,20 @@ package course
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"select-course/demo1/src/constant/code"
-	"select-course/demo1/src/models"
-	"select-course/demo1/src/models/request"
-	"select-course/demo1/src/storage/database"
-	"select-course/demo1/src/utils/logger"
-	"select-course/demo1/src/utils/resp"
-	"time"
+	"select-course/demo2/src/constant/code"
+	"select-course/demo2/src/constant/keys"
+	"select-course/demo2/src/models"
+	"select-course/demo2/src/models/request"
+	"select-course/demo2/src/storage/cache"
+	"select-course/demo2/src/storage/database"
+	"select-course/demo2/src/utils/bloom"
+	"select-course/demo2/src/utils/logger"
+	"select-course/demo2/src/utils/resp"
+	"strconv"
 )
 
 func GetCourseList(ctx *gin.Context) {
@@ -35,45 +39,84 @@ func SelectCourse(ctx *gin.Context) {
 		resp.ParamErr(ctx)
 		return
 	}
+
+	// 2. 校验操作
+	// 2.1 判断课程是否存在
+	if !bloom.CourseBloom.TestString(fmt.Sprintf("%d", req.CourseID)) {
+		resp.Fail(ctx, code.NotFound, code.CourseNotFound, code.CourseNotFoundMsg)
+		return
+	}
+	// 2.2 判断用户是否存在 这里可以防止缓存穿透
+	if !bloom.UserBloom.TestString(fmt.Sprintf("%d", req.UserID)) {
+		resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
+		return
+	}
+	// 2.3. 用户是否已经选择该门课程
+	if exist := cache.RDB.HExists(ctx, keys.UserCourseSetKey, fmt.Sprintf("%d", req.UserID)).Val(); exist {
+		logger.Logger.WithContext(ctx).Info("用户已经选择该门课程")
+		resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
+		return
+	}
+	// 2.4. 获取用户flag
 	var user models.User
+	if err := database.Client.Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("id=?", req.UserID).
+		First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Logger.WithContext(ctx).Info("用户不存在", err)
+			resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
+			return
+		}
+	}
 
+	// 2.5. 是否存在课程时间冲突
+	key := fmt.Sprintf(keys.CourseHsetKey, req.CourseID)
+	weekStr := cache.RDB.HGet(ctx, key, keys.CourseScheduleWeekKey).Val()
+	durationStr := cache.RDB.HGet(ctx, key, keys.CourseScheduleDurationKey).Val()
+	week, _ := strconv.Atoi(weekStr)
+	duration, _ := strconv.Atoi(durationStr)
+	offset := week*3 + duration - 1
+	if user.Flag.TestBit(offset) {
+		logger.Logger.WithContext(ctx).Info("用户已选该课程或时间冲突")
+		resp.Fail(ctx, code.ParamErr, code.CourseTimeConflict, code.CourseTimeConflictMsg)
+		return
+	}
+
+	// 2.6. 扣减课程容量与创建课程操作
+	var err error
+	var capacityStr string
+	if capacityStr, err = cache.RDB.HGet(ctx, key, keys.CourseCapacityKey).Result(); err != nil {
+		logger.Logger.WithContext(ctx).Info("获取课程容量失败", err)
+	}
+	if capacity, _ := strconv.Atoi(capacityStr); capacity <= 0 {
+		logger.Logger.WithContext(ctx).Info("课程容量不足", err)
+		resp.Fail(ctx, code.Fail, code.CourseFull, code.CourseFullMsg)
+		return
+	}
+	// 3. 创建操作
+	// 3.1 扣减课程容量
+	if err := cache.RDB.HIncrBy(ctx, key, keys.CourseCapacityKey, -1).Err(); err != nil {
+		logger.Logger.WithContext(ctx).Info("扣减课程容量失败", err)
+		resp.DBError(ctx)
+	}
+	// 3.2 加入到用户课程集合
+	if err := cache.RDB.SAdd(ctx, fmt.Sprintf(keys.UserCourseSetKey, req.UserID), req.CourseID).Err(); err != nil {
+		logger.Logger.WithContext(ctx).Info("加入到用户课程集合失败", err)
+		resp.DBError(ctx)
+	}
+
+	// 异步写入到数据库
+	go Async2Mysql(ctx, &user, req.CourseID, offset)
+
+	// 事务成功，响应成功
+	resp.Success(ctx, nil)
+}
+func Async2Mysql(ctx *gin.Context, user *models.User, courseID uint, offset int) {
 	// 2. 数据库操作
-	if err := database.Client.WithContext(context.Background()).Transaction(func(tx *gorm.DB) error {
-		// 2.1 用户是否已选该门课程（这里可以不用判断因为如果用户选择了该门课程就会存在时间冲突
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-			Where("id=?", req.UserID).
-			First(&user).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				logger.Logger.WithContext(ctx).Info("用户不存在", err)
-				resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
-			}
-		}
-		time.Sleep(time.Second * 50)
-
-		// 2.2 检查课程是否存在和库存
-		var course models.Course
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-			Model(models.Course{}).
-			Preload("Schedule").
-			Where("id=? and capacity > 0", req.CourseID).
-			First(&course).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				logger.Logger.WithContext(ctx).Info("课程不存在或库存不足", err)
-				resp.Fail(ctx, code.NotFound, code.CourseNotFound, code.CourseNotFoundMsg)
-				return nil //无需回滚，业务逻辑错误
-			}
-			return err
-		}
-		// 2.3 检查用户是否已选该课程或时间冲突
-		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration) - 1
-		if user.Flag.TestBit(offset) {
-			logger.Logger.WithContext(ctx).Info("用户已选该课程或时间冲突")
-			resp.Fail(ctx, code.ParamErr, code.CourseTimeConflict, code.CourseTimeConflictMsg)
-			return errors.New("用户已选该课程或时间冲突")
-		}
-
+	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 2.4 扣减课程库存
-		if err := tx.Model(&course).
+		if err := tx.Model(&models.Course{}).
+			Where("id=?", courseID).
 			Update("capacity", gorm.Expr("capacity - 1")).Error; err != nil {
 			logger.Logger.WithContext(ctx).Info("更新课程容量失败", err)
 			resp.DBError(ctx)
@@ -81,8 +124,8 @@ func SelectCourse(ctx *gin.Context) {
 		}
 		// 2.5 创建选课记录
 		if err := tx.Create(&models.UserCourse{
-			UserID:   req.UserID,
-			CourseID: req.CourseID,
+			UserID:   user.ID,
+			CourseID: courseID,
 		}).Error; err != nil {
 			logger.Logger.WithContext(ctx).Info("创建选课记录失败", err)
 			resp.DBError(ctx)
@@ -100,10 +143,7 @@ func SelectCourse(ctx *gin.Context) {
 		logger.Logger.WithContext(ctx).Info("事务回滚", err)
 		return
 	}
-	// 事务成功，响应成功
-	resp.Success(ctx, nil)
 }
-
 func BackCourse(ctx *gin.Context) {
 	// 1. 参数校验
 	var req request.SelectCourseReq

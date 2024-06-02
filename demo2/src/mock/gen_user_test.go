@@ -1,0 +1,20 @@
+package mock
+
+import (
+	"select-course/demo2/src/models"
+	"select-course/demo2/src/storage/database"
+	"strconv"
+	"testing"
+)
+
+func TestInsertUsers(t *testing.T) {
+	var users []models.User
+	for i := 0; i < 100; i++ {
+		users = append(users, models.User{
+			BaseModel: models.BaseModel{ID: uint(i)},
+			UserName:  "users" + strconv.Itoa(i),
+			Password:  "password" + strconv.Itoa(i),
+		})
+	}
+	database.Client.Create(users)
+}
