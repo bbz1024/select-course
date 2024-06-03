@@ -22,6 +22,11 @@ func InitApiRouter() *gin.Engine {
 	}
 	v1 := router.Group("api/v1")
 	v1.Use(middleware.Auth)
+	v1.GET("ping/", func(context *gin.Context) {
+		context.JSON(200, gin.H{
+			"message": "pong",
+		})
+	})
 	user := v1.Group("user")
 
 	{

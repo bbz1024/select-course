@@ -34,10 +34,10 @@ type envConfig struct {
 	RedisMaxActiveConns int    `env:"RedisMaxActiveConns" envDefault:"100"`
 }
 
-// var path = "../../.env.dev"
+//var path = "../../.env.dev"
+
 var path = "demo2/.env.dev"
 
-// ../../.env.dev
 func init() {
 
 	if err := godotenv.Load(path); err != nil {

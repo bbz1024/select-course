@@ -32,7 +32,7 @@ func TestInsertSchedule(t *testing.T) {
 	var schedule []models.Schedule
 	week := 5
 	duration := 3
-	for i := 1; i <= week; i++ {
+	for i := 0; i < week; i++ {
 		for j := 1; j <= duration; j++ {
 			schedule = append(schedule, models.Schedule{
 				Week:     models.Week(i),

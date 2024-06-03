@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"select-course/demo2/src/constant/code"
 	"select-course/demo2/src/constant/keys"
+	"select-course/demo2/src/constant/lua"
 	"select-course/demo2/src/models"
 	"select-course/demo2/src/models/request"
 	"select-course/demo2/src/storage/cache"
@@ -17,6 +19,7 @@ import (
 	"select-course/demo2/src/utils/logger"
 	"select-course/demo2/src/utils/resp"
 	"strconv"
+	"sync"
 )
 
 func GetCourseList(ctx *gin.Context) {
@@ -51,67 +54,95 @@ func SelectCourse(ctx *gin.Context) {
 		resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
 		return
 	}
-	// 2.3. 用户是否已经选择该门课程
-	if exist := cache.RDB.HExists(ctx, keys.UserCourseSetKey, fmt.Sprintf("%d", req.UserID)).Val(); exist {
-		logger.Logger.WithContext(ctx).Info("用户已经选择该门课程")
-		resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
-		return
-	}
-	// 2.4. 获取用户flag
-	var user models.User
-	if err := database.Client.Clauses(clause.Locking{Strength: "SHARE"}).
-		Where("id=?", req.UserID).
-		First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Logger.WithContext(ctx).Info("用户不存在", err)
-			resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
-			return
+	// 3. 执行操作
+	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 1. 获取课程的week和duration
+		var course models.Course
+		if err := tx.Model(&models.Course{}).Preload("Schedule").First(&course, req.CourseID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			return err
 		}
-	}
+		// 2. 获取用户的flag字段
+		var user models.User
+		//
+		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ?", req.UserID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			return err
+		}
 
-	// 2.5. 是否存在课程时间冲突
-	key := fmt.Sprintf(keys.CourseHsetKey, req.CourseID)
-	weekStr := cache.RDB.HGet(ctx, key, keys.CourseScheduleWeekKey).Val()
-	durationStr := cache.RDB.HGet(ctx, key, keys.CourseScheduleDurationKey).Val()
-	week, _ := strconv.Atoi(weekStr)
-	duration, _ := strconv.Atoi(durationStr)
-	offset := week*3 + duration - 1
-	if user.Flag.TestBit(offset) {
-		logger.Logger.WithContext(ctx).Info("用户已选该课程或时间冲突")
-		resp.Fail(ctx, code.ParamErr, code.CourseTimeConflict, code.CourseTimeConflictMsg)
+		/*
+		   args:
+		      key1 = 用户key
+		      key2 = 课程id
+		      key3 = 课程key
+		      key4 = capacity key
+		   return:
+		      0 : 执行正常
+		      1 : 用户是否已经选择了
+		      2 : 课程满了
+		*/
+		// 3. 判断是否选存在时间冲突
+		offset := int(course.Schedule.Week*3) + int(course.Schedule.Duration)
+		if user.Flag.TestBit(offset) {
+			resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
+			return errors.New("用户已经选过该课程")
+		}
+		// 4. 修改用户flag
+		user.Flag.SetBit(offset)
+		if err := tx.Save(&user).Error; err != nil {
+			return err
+		}
+		// 5. 执行脚本进行扣减课程和创建
+		script := redis.NewScript(lua.CourseSelectLuaScript)
+		var val interface{}
+		var err2 error
+		if val, err2 = script.Run(ctx, cache.RDB, []string{
+			fmt.Sprintf(keys.UserCourseSetKey, req.UserID),
+			strconv.Itoa(int(req.CourseID)),
+			fmt.Sprintf(keys.CourseHsetKey, req.CourseID),
+			keys.CourseCapacityKey,
+		}, req.UserID, req.CourseID).Result(); err2 != nil {
+			logger.Logger.WithContext(ctx).Info("执行lua脚本失败", err2)
+			resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
+			return err2
+		}
+		switch val.(int64) {
+		case lua.CourseSelectOK:
+			logger.Logger.WithContext(ctx).Info("选课成功")
+			go AsyncSelect2Mysql(ctx, req.UserID, req.CourseID)
+		case lua.CourseSelected:
+			logger.Logger.WithContext(ctx).Info("用户已经选择该门课程")
+			resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
+			return errors.New("用户已经选择该门课程")
+		case lua.CourseFull:
+			logger.Logger.WithContext(ctx).Info("课程已满")
+			resp.Fail(ctx, code.Fail, code.CourseFull, code.CourseFullMsg)
+			return errors.New("课程已满")
+		default:
+			logger.Logger.WithContext(ctx).Info("未知错误")
+			return errors.New("未知错误")
+		}
+
+		return nil
+	}); err != nil {
+		logger.Logger.WithContext(ctx).Info("事务失败", err)
+		resp.Fail(ctx, code.Fail, code.DBError, code.DBErrorMsg)
 		return
 	}
-
-	// 2.6. 扣减课程容量与创建课程操作
-	var err error
-	var capacityStr string
-	if capacityStr, err = cache.RDB.HGet(ctx, key, keys.CourseCapacityKey).Result(); err != nil {
-		logger.Logger.WithContext(ctx).Info("获取课程容量失败", err)
-	}
-	if capacity, _ := strconv.Atoi(capacityStr); capacity <= 0 {
-		logger.Logger.WithContext(ctx).Info("课程容量不足", err)
-		resp.Fail(ctx, code.Fail, code.CourseFull, code.CourseFullMsg)
-		return
-	}
-	// 3. 创建操作
-	// 3.1 扣减课程容量
-	if err := cache.RDB.HIncrBy(ctx, key, keys.CourseCapacityKey, -1).Err(); err != nil {
-		logger.Logger.WithContext(ctx).Info("扣减课程容量失败", err)
-		resp.DBError(ctx)
-	}
-	// 3.2 加入到用户课程集合
-	if err := cache.RDB.SAdd(ctx, fmt.Sprintf(keys.UserCourseSetKey, req.UserID), req.CourseID).Err(); err != nil {
-		logger.Logger.WithContext(ctx).Info("加入到用户课程集合失败", err)
-		resp.DBError(ctx)
-	}
-
-	// 异步写入到数据库
-	go Async2Mysql(ctx, &user, req.CourseID, offset)
 
 	// 事务成功，响应成功
 	resp.Success(ctx, nil)
 }
-func Async2Mysql(ctx *gin.Context, user *models.User, courseID uint, offset int) {
+
+var mutex sync.Mutex
+
+func AsyncSelect2Mysql(ctx *gin.Context, userID uint, courseID uint) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	// 2. 数据库操作
 	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 2.4 扣减课程库存
@@ -124,21 +155,37 @@ func Async2Mysql(ctx *gin.Context, user *models.User, courseID uint, offset int)
 		}
 		// 2.5 创建选课记录
 		if err := tx.Create(&models.UserCourse{
-			UserID:   user.ID,
+			UserID:   userID,
 			CourseID: courseID,
 		}).Error; err != nil {
 			logger.Logger.WithContext(ctx).Info("创建选课记录失败", err)
 			resp.DBError(ctx)
 			return err
 		}
-		// 2.6 更新用户选课记录
-		user.Flag.SetBit(offset)
-		if err := tx.Save(&user).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("更新用户选课记录失败", err)
+		return nil // 成功，无错误返回
+	}); err != nil {
+		logger.Logger.WithContext(ctx).Info("事务回滚", err)
+		return
+	}
+}
+
+func AsyncBack2Mysql(ctx *gin.Context, userID uint, courseID uint) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.Course{}).
+			Where("id=?", courseID).
+			Update("capacity", gorm.Expr("capacity + 1")).Error; err != nil {
+			logger.Logger.WithContext(ctx).Info("更新课程容量失败", err)
 			resp.DBError(ctx)
 			return err
 		}
-		return nil // 成功，无错误返回
+		if err := tx.Where("user_id=? and course_id=?", userID, courseID).Delete(&models.UserCourse{}).Error; err != nil {
+			logger.Logger.WithContext(ctx).Info("删除选课记录失败", err)
+			resp.DBError(ctx)
+			return err
+		}
+		return nil
 	}); err != nil {
 		logger.Logger.WithContext(ctx).Info("事务回滚", err)
 		return
@@ -154,19 +201,6 @@ func BackCourse(ctx *gin.Context) {
 	}
 	// 2. 数据库操作
 	if err := database.Client.WithContext(context.Background()).Transaction(func(tx *gorm.DB) error {
-		// 2.1 用户是否选择了该课程
-		var userCourse models.UserCourse
-		if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-			Where("user_id=? and course_id=?", req.UserID, req.CourseID).
-			First(&userCourse).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				logger.Logger.WithContext(ctx).Info("用户未选该课程", err)
-				resp.Fail(ctx, code.ParamErr, code.CourseNotSelected, code.CourseNotSelectedMsg)
-				return err
-			}
-			resp.DBError(ctx)
-			return err
-		}
 		// 2.2 获取课程信息，获取schedule的week和duration 计算出offset
 		var course models.Course
 		if err := tx.Model(models.Course{}).
@@ -194,28 +228,45 @@ func BackCourse(ctx *gin.Context) {
 			resp.DBError(ctx)
 			return err
 		}
-		// 2.4 删除选课记录
-		if err := tx.Where("user_id=? and course_id=?", req.UserID, req.CourseID).
-			Delete(&models.UserCourse{}).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("删除选课记录失败", err)
-			resp.DBError(ctx)
-			return err
-		}
-		// 2.5 课程容量+1
-		if err := tx.Model(&course).
-			Update("capacity", gorm.Expr("capacity + 1")).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("更新课程容量失败", err)
-			resp.DBError(ctx)
-			return err
+
+		if !user.Flag.TestBit(int(course.Schedule.Week*3) + int(course.Schedule.Duration)) {
+			logger.Logger.WithContext(ctx).Info("用户没有选过该课程")
+			resp.Fail(ctx, code.Fail, code.CourseNotSelected, code.CourseNotSelectedMsg)
+			return errors.New("用户没有选过该课程")
 		}
 		// 2.6 更新用户选课记录
-		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration) - 1
+		offset := int(course.Schedule.Week)*3 + int(course.Schedule.Duration)
 		user.Flag.ClearBit(offset)
 		if err := tx.Save(&user).Error; err != nil {
 			logger.Logger.WithContext(ctx).Info("更新用户选课记录失败", err)
 			resp.DBError(ctx)
 			return err
 		}
+		script := redis.NewScript(lua.CourseBackLuaScript)
+		var val interface{}
+		var err2 error
+		if val, err2 = script.Run(ctx, cache.RDB, []string{
+			fmt.Sprintf(keys.UserCourseSetKey, req.UserID),
+			strconv.Itoa(int(req.CourseID)),
+			fmt.Sprintf(keys.CourseHsetKey, req.CourseID),
+			keys.CourseCapacityKey,
+		}, req.UserID, req.CourseID).Result(); err2 != nil {
+			logger.Logger.WithContext(ctx).Info("执行lua脚本失败", err2)
+			resp.Fail(ctx, code.Fail, code.CourseNotSelected, code.CourseNotSelectedMsg)
+			return err2
+		}
+
+		switch val.(int64) {
+		case lua.CourseBackOK:
+			logger.Logger.WithContext(ctx).Info("退课成功")
+			go AsyncBack2Mysql(ctx, req.UserID, req.CourseID)
+			return nil
+		case lua.CourseNotSelected:
+			logger.Logger.WithContext(ctx).Info()
+			resp.Fail(ctx, code.Fail, code.CourseNotSelected, code.CourseNotSelectedMsg)
+			return errors.New("用户没有选过该课程")
+		}
+
 		return nil
 	}); err != nil {
 		logger.Logger.WithContext(ctx).Info("事务回滚", err)
