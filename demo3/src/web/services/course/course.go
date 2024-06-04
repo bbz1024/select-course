@@ -8,18 +8,19 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"select-course/demo2/src/constant/code"
-	"select-course/demo2/src/constant/keys"
-	"select-course/demo2/src/constant/lua"
-	"select-course/demo2/src/models"
-	"select-course/demo2/src/models/request"
-	"select-course/demo2/src/storage/cache"
-	"select-course/demo2/src/storage/database"
-	"select-course/demo2/src/utils/bloom"
-	"select-course/demo2/src/utils/logger"
-	"select-course/demo2/src/utils/resp"
+	"select-course/demo3/src/constant/code"
+	"select-course/demo3/src/constant/keys"
+	"select-course/demo3/src/constant/lua"
+	"select-course/demo3/src/models"
+	"select-course/demo3/src/models/mqm"
+	"select-course/demo3/src/models/request"
+	"select-course/demo3/src/storage/cache"
+	"select-course/demo3/src/storage/database"
+	"select-course/demo3/src/utils/bloom"
+	"select-course/demo3/src/utils/consumer"
+	"select-course/demo3/src/utils/logger"
+	"select-course/demo3/src/utils/resp"
 	"strconv"
-	"sync"
 )
 
 func GetCourseList(ctx *gin.Context) {
@@ -32,6 +33,31 @@ func GetCourseList(ctx *gin.Context) {
 		return
 	}
 	resp.Success(ctx, courseList)
+}
+func MyCourseList(ctx *gin.Context) {
+	var req request.UserReq
+	if err := ctx.ShouldBind(&req); err != nil {
+		logger.Logger.Info("参数校验失败", err)
+		resp.ParamErr(ctx)
+		return
+	}
+	var userCourse []*models.UserCourse
+	if err := database.Client.
+		Preload("Course").
+		Preload("Course.Category").
+		Preload("Course.Schedule").
+		Where("user_id=?", req.UserID).
+		Find(&userCourse).
+		Error; err != nil {
+		logger.Logger.WithContext(ctx).Info("获取用户选课记录失败", err)
+		resp.DBError(ctx)
+		return
+	}
+	var course []*models.Course
+	for _, v := range userCourse {
+		course = append(course, v.Course)
+	}
+	resp.Success(ctx, course)
 }
 
 func SelectCourse(ctx *gin.Context) {
@@ -113,7 +139,13 @@ func SelectCourse(ctx *gin.Context) {
 		switch val.(int64) {
 		case lua.CourseSelectOK:
 			logger.Logger.WithContext(ctx).Info("选课成功")
-			go AsyncSelect2Mysql(ctx, req.UserID, req.CourseID)
+			//放入mq进行消费
+			consumer.SelectConsumer.Product(
+				&mqm.CourseReq{
+					UserID:   req.UserID,
+					CourseID: req.CourseID,
+				},
+			)
 		case lua.CourseSelected:
 			logger.Logger.WithContext(ctx).Info("用户已经选择该门课程")
 			resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
@@ -126,7 +158,6 @@ func SelectCourse(ctx *gin.Context) {
 			logger.Logger.WithContext(ctx).Info("未知错误")
 			return errors.New("未知错误")
 		}
-
 		return nil
 	}); err != nil {
 		logger.Logger.WithContext(ctx).Info("事务失败", err)
@@ -136,60 +167,6 @@ func SelectCourse(ctx *gin.Context) {
 
 	// 事务成功，响应成功
 	resp.Success(ctx, nil)
-}
-
-var mutex sync.Mutex
-
-func AsyncSelect2Mysql(ctx *gin.Context, userID uint, courseID uint) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	// 2. 数据库操作
-	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 2.4 扣减课程库存
-		if err := tx.Model(&models.Course{}).
-			Where("id=?", courseID).
-			Update("capacity", gorm.Expr("capacity - 1")).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("更新课程容量失败", err)
-			resp.DBError(ctx)
-			return err
-		}
-		// 2.5 创建选课记录
-		if err := tx.Create(&models.UserCourse{
-			UserID:   userID,
-			CourseID: courseID,
-		}).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("创建选课记录失败", err)
-			resp.DBError(ctx)
-			return err
-		}
-		return nil // 成功，无错误返回
-	}); err != nil {
-		logger.Logger.WithContext(ctx).Info("事务回滚", err)
-		return
-	}
-}
-
-func AsyncBack2Mysql(ctx *gin.Context, userID uint, courseID uint) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if err := database.Client.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&models.Course{}).
-			Where("id=?", courseID).
-			Update("capacity", gorm.Expr("capacity + 1")).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("更新课程容量失败", err)
-			resp.DBError(ctx)
-			return err
-		}
-		if err := tx.Where("user_id=? and course_id=?", userID, courseID).Delete(&models.UserCourse{}).Error; err != nil {
-			logger.Logger.WithContext(ctx).Info("删除选课记录失败", err)
-			resp.DBError(ctx)
-			return err
-		}
-		return nil
-	}); err != nil {
-		logger.Logger.WithContext(ctx).Info("事务回滚", err)
-		return
-	}
 }
 
 func BackCourse(ctx *gin.Context) {
@@ -260,7 +237,13 @@ func BackCourse(ctx *gin.Context) {
 		switch val.(int64) {
 		case lua.CourseBackOK:
 			logger.Logger.WithContext(ctx).Info("退课成功")
-			go AsyncBack2Mysql(ctx, req.UserID, req.CourseID)
+			//放入mq进行消费
+			consumer.BackConsumer.Product(
+				&mqm.CourseReq{
+					UserID:   req.UserID,
+					CourseID: req.CourseID,
+				},
+			)
 			return nil
 		case lua.CourseNotSelected:
 			logger.Logger.WithContext(ctx).Info()
@@ -275,29 +258,4 @@ func BackCourse(ctx *gin.Context) {
 	}
 	// 事务成功，响应成功
 	resp.Success(ctx, nil)
-}
-func MyCourseList(ctx *gin.Context) {
-	var req request.UserReq
-	if err := ctx.ShouldBind(&req); err != nil {
-		logger.Logger.Info("参数校验失败", err)
-		resp.ParamErr(ctx)
-		return
-	}
-	var userCourse []*models.UserCourse
-	if err := database.Client.
-		Preload("Course").
-		Preload("Course.Category").
-		Preload("Course.Schedule").
-		Where("user_id=?", req.UserID).
-		Find(&userCourse).
-		Error; err != nil {
-		logger.Logger.WithContext(ctx).Info("获取用户选课记录失败", err)
-		resp.DBError(ctx)
-		return
-	}
-	var course []*models.Course
-	for _, v := range userCourse {
-		course = append(course, v.Course)
-	}
-	resp.Success(ctx, course)
 }
