@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 type Duration uint8
 type Week uint8
 
@@ -53,9 +51,10 @@ type Schedule struct {
 
 // UserCourse 用户选课关系表
 type UserCourse struct {
-	UserID    uint      `json:"userID" gorm:"not null;uniqueIndex:user_course;comment:用户ID"`
-	User      *User     `json:"users" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:用户"`
-	CourseID  uint      `json:"courseID" gorm:"not null;uniqueIndex:user_course;comment:课程ID"`
-	Course    *Course   `json:"course" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程"`
-	CreatedAt time.Time `json:"created_at" comment:"创建时间"`
+	UserID    uint    `json:"userID" gorm:"not null;uniqueIndex:user_course;comment:用户ID"`
+	User      *User   `json:"users" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:用户"`
+	CourseID  uint    `json:"courseID" gorm:"not null;uniqueIndex:user_course;comment:课程ID"`
+	Course    *Course `json:"course" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程"`
+	CreatedAt int64   `json:"created_at" comment:"创建时间"`
+	IsDeleted bool    `json:"is_deleted" gorm:"type:bool;not null;default:false;comment:是否删除"`
 }

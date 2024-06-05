@@ -41,9 +41,9 @@ type envConfig struct {
 	RabbitMQVhost    string `env:"RabbitMQVhost" envDefault:"test"`
 }
 
-//var path = "../../.env.dev"
+var path = "../../.env.dev"
 
-var path = "demo3/.env.dev"
+//var path = "demo3/.env.dev"
 
 func init() {
 

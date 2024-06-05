@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/streadway/amqp"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"math/rand"
 	"select-course/demo3/src/constant/variable"
 	"select-course/demo3/src/models"
@@ -13,6 +14,7 @@ import (
 	"select-course/demo3/src/storage/database"
 	"select-course/demo3/src/storage/mq"
 	"select-course/demo3/src/utils/logger"
+	"time"
 )
 
 var SelectConsumer *Select
@@ -37,19 +39,39 @@ func InitSelectListener() error {
 }
 
 func (s *Select) Declare() error {
-	err := s.channel.ExchangeDeclare(variable.SelectExchange, variable.SelectKind,
+	var err error
+	err = s.channel.ExchangeDeclare(
+		variable.DeadExchange, variable.DeadKind,
 		true, false, false, false, nil,
 	)
 	if err != nil {
 		return err
 	}
-	_, err = s.channel.QueueDeclare(variable.SelectQueue, true,
+	_, err = s.channel.QueueDeclare(
+		variable.DeadQueue, true,
 		false, false, false, nil,
+	)
+
+	err = s.channel.ExchangeDeclare(variable.SelectExchange, variable.SelectKind,
+		true, false, false, false, nil,
 	)
 	if err != nil {
 		return err
 	}
-	// 将队列绑定到交换机上
+	err = s.channel.QueueBind(variable.DeadQueue, variable.DeadRoutingKey,
+		variable.DeadExchange, false, nil)
+	if err != nil {
+		return err
+	}
+	_, err = s.channel.QueueDeclare(variable.SelectQueue, true,
+		false, false, false, amqp.Table{
+			"x-dead-letter-exchange":    variable.DeadExchange,
+			"x-dead-letter-routing-key": variable.DeadRoutingKey,
+		},
+	)
+	if err != nil {
+		return err
+	}
 	err = s.channel.QueueBind(variable.SelectQueue, variable.SelectRoutingKey,
 		variable.SelectExchange, false, nil)
 	if err != nil {
@@ -59,12 +81,11 @@ func (s *Select) Declare() error {
 }
 
 func (s *Select) Consumer() {
-	//接收消息
 	results, err := SelectConsumer.channel.Consume(
 		variable.SelectQueue,
 		variable.SelectRoutingKey,
 		false, // 关闭自动应答
-		false, //
+		false,
 		false,
 		false,
 		nil,
@@ -73,80 +94,100 @@ func (s *Select) Consumer() {
 		logger.Logger.Error("消息接收失败", err)
 		return
 	}
-	//启用后台协程处理消息
+
 	go func() {
 		for res := range results {
 			var msg *mqm.CourseReq
-			var err error
-			err = json.Unmarshal(res.Body, &msg)
+			err := json.Unmarshal(res.Body, &msg)
 			if err != nil {
 				logger.Logger.Error("消息反序列化失败", err)
+				res.Reject(false)
 				continue
 			}
-			switch msg.Type {
 
-			case mqm.SelectType:
-				err = database.Client.Transaction(func(tx *gorm.DB) error {
-					// 2.4 扣减课程库存
-					if err := tx.Model(&models.Course{}).
-						Where("id=?", msg.CourseID).
-						Update("capacity", gorm.Expr("capacity - 1")).Error; err != nil {
-						logger.Logger.Info("更新课程容量失败", err)
+			err = database.Client.Transaction(func(tx *gorm.DB) error {
+				switch msg.Type {
+				case mqm.SelectType:
+					if err := updateCourseCapacityAndUserCourse(tx, msg, true); err != nil {
 						return err
 					}
-					// 2.5 创建选课记录
-					if err := tx.Create(&models.UserCourse{
-						UserID:   msg.UserID,
-						CourseID: msg.CourseID,
-					}).Error; err != nil {
-						logger.Logger.Info("创建选课记录失败", err)
+				case mqm.BackType:
+					if err := updateCourseCapacityAndUserCourse(tx, msg, false); err != nil {
 						return err
 					}
-					random := rand.Int()
-					if random&1 == 0 {
-						return errors.New("模拟事务错误")
-					}
-					return nil // 成功，无错误返回
-				})
-			case mqm.BackType:
-				err = database.Client.Transaction(func(tx *gorm.DB) error {
-					if err := tx.Model(&models.Course{}).
-						Where("id=?", msg.CourseID).
-						Update("capacity", gorm.Expr("capacity + 1")).Error; err != nil {
-						logger.Logger.Info("更新课程容量失败", err)
-						return err
-					}
-					if err := tx.Where("user_id=? and course_id=?", msg.UserID, msg.CourseID).Delete(&models.UserCourse{}).Error; err != nil {
-						logger.Logger.Info("删除选课记录失败", err)
-						return err
-					}
-					random := rand.Int()
-					if random&1 == 0 {
-						return errors.New("模拟事务错误")
-					}
-					return nil
-				})
-			}
+				default:
+					return fmt.Errorf("未知的消息类型: %s", msg.Type)
+				}
+
+				// 模拟事务错误
+				if rand.Int()&1 == 0 {
+					return errors.New("模拟事务错误")
+				}
+
+				return nil
+			})
+
 			if err != nil {
 				logger.Logger.Error("事务失败", err)
-				if err := res.Nack(false, true); err != nil {
-					logger.Logger.Error("消息确认失败", err)
-				}
+				res.Reject(false)
 				continue
 			}
-			// 扣减库存操作
-			err = res.Ack(false)
-			if err != nil {
-				if err := res.Nack(false, true); err != nil {
-					logger.Logger.Error("消息确认失败", err)
-				}
+
+			// 消息确认
+			if err := res.Ack(false); err != nil {
 				logger.Logger.Error("消息确认失败", err)
-				continue
 			}
 		}
 	}()
 }
+
+func updateCourseCapacityAndUserCourse(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
+	capacityOp := gorm.Expr("capacity - 1")
+	if !selectAction {
+		capacityOp = gorm.Expr("capacity + 1")
+	}
+
+	if err := tx.Model(&models.Course{}).
+		Where("id=?", msg.CourseID).
+		Update("capacity", capacityOp).Error; err != nil {
+		logger.Logger.Debug("更新课程容量", err)
+		return err
+	}
+
+	var userCourse models.UserCourse
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
+		Where("user_id=? and course_id=?", msg.UserID, msg.CourseID).
+		First(&userCourse).Error; err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		userCourse = models.UserCourse{
+			UserID:    msg.UserID,
+			CourseID:  msg.CourseID,
+			CreatedAt: msg.CreatedAt,
+			IsDeleted: !selectAction,
+		}
+
+		if err := tx.Create(&userCourse).Error; err != nil {
+			logger.Logger.Debug("创建/更新选课记录", err)
+			return err
+		}
+	} else {
+		userCourse.CreatedAt = msg.CreatedAt
+		userCourse.IsDeleted = !selectAction
+		if err := tx.Save(&userCourse).Error; err != nil {
+			logger.Logger.Debug("创建/更新选课记录", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *Select) Product(msg *mqm.CourseReq) {
+	// 毫秒 记录每条消息的时间,确保加入到死信队列后期执行消费的顺序
+	msg.CreatedAt = time.Now().UnixMilli()
 	bytes, err := json.Marshal(msg)
 	if err != nil {
 		logger.Logger.Error("消息序列化失败", err)
