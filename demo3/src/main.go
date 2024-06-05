@@ -29,8 +29,5 @@ func Initialize() {
 		logger.Logger.Error(err)
 		panic(err)
 	}
-	if err := consumer.InitBackListener(); err != nil {
-		logger.Logger.Error(err)
-		panic(err)
-	}
+
 }

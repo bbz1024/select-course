@@ -144,6 +144,7 @@ func SelectCourse(ctx *gin.Context) {
 				&mqm.CourseReq{
 					UserID:   req.UserID,
 					CourseID: req.CourseID,
+					Type:     mqm.SelectType,
 				},
 			)
 		case lua.CourseSelected:
@@ -238,10 +239,11 @@ func BackCourse(ctx *gin.Context) {
 		case lua.CourseBackOK:
 			logger.Logger.WithContext(ctx).Info("退课成功")
 			//放入mq进行消费
-			consumer.BackConsumer.Product(
+			consumer.SelectConsumer.Product(
 				&mqm.CourseReq{
 					UserID:   req.UserID,
 					CourseID: req.CourseID,
+					Type:     mqm.BackType,
 				},
 			)
 			return nil

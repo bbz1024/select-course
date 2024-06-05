@@ -2,9 +2,11 @@ package consumer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/streadway/amqp"
 	"gorm.io/gorm"
+	"math/rand"
 	"select-course/demo3/src/constant/variable"
 	"select-course/demo3/src/models"
 	"select-course/demo3/src/models/mqm"
@@ -69,47 +71,77 @@ func (s *Select) Consumer() {
 	)
 	if err != nil {
 		logger.Logger.Error("消息接收失败", err)
+		return
 	}
 	//启用后台协程处理消息
 	go func() {
 		for res := range results {
 			var msg *mqm.CourseReq
-			err := json.Unmarshal(res.Body, &msg)
+			var err error
+			err = json.Unmarshal(res.Body, &msg)
 			if err != nil {
 				logger.Logger.Error("消息反序列化失败", err)
 				continue
 			}
-			// 扣减库存操作
-			if err := database.Client.Transaction(func(tx *gorm.DB) error {
-				// 2.4 扣减课程库存
-				if err := tx.Model(&models.Course{}).
-					Where("id=?", msg.CourseID).
-					Update("capacity", gorm.Expr("capacity - 1")).Error; err != nil {
-					logger.Logger.Info("更新课程容量失败", err)
-					return err
-				}
-				// 2.5 创建选课记录
-				if err := tx.Create(&models.UserCourse{
-					UserID:   msg.UserID,
-					CourseID: msg.CourseID,
-				}).Error; err != nil {
-					logger.Logger.Info("创建选课记录失败", err)
-					return err
-				}
-				return nil // 成功，无错误返回
-			}); err != nil {
-				err := res.Nack(false, true)
-				if err != nil {
-					logger.Logger.Error("消息确认失败", err)
-					return
-				}
-				logger.Logger.Info("事务回滚", err)
-				return
+			switch msg.Type {
+
+			case mqm.SelectType:
+				err = database.Client.Transaction(func(tx *gorm.DB) error {
+					// 2.4 扣减课程库存
+					if err := tx.Model(&models.Course{}).
+						Where("id=?", msg.CourseID).
+						Update("capacity", gorm.Expr("capacity - 1")).Error; err != nil {
+						logger.Logger.Info("更新课程容量失败", err)
+						return err
+					}
+					// 2.5 创建选课记录
+					if err := tx.Create(&models.UserCourse{
+						UserID:   msg.UserID,
+						CourseID: msg.CourseID,
+					}).Error; err != nil {
+						logger.Logger.Info("创建选课记录失败", err)
+						return err
+					}
+					random := rand.Int()
+					if random&1 == 0 {
+						return errors.New("模拟事务错误")
+					}
+					return nil // 成功，无错误返回
+				})
+			case mqm.BackType:
+				err = database.Client.Transaction(func(tx *gorm.DB) error {
+					if err := tx.Model(&models.Course{}).
+						Where("id=?", msg.CourseID).
+						Update("capacity", gorm.Expr("capacity + 1")).Error; err != nil {
+						logger.Logger.Info("更新课程容量失败", err)
+						return err
+					}
+					if err := tx.Where("user_id=? and course_id=?", msg.UserID, msg.CourseID).Delete(&models.UserCourse{}).Error; err != nil {
+						logger.Logger.Info("删除选课记录失败", err)
+						return err
+					}
+					random := rand.Int()
+					if random&1 == 0 {
+						return errors.New("模拟事务错误")
+					}
+					return nil
+				})
 			}
+			if err != nil {
+				logger.Logger.Error("事务失败", err)
+				if err := res.Nack(false, true); err != nil {
+					logger.Logger.Error("消息确认失败", err)
+				}
+				continue
+			}
+			// 扣减库存操作
 			err = res.Ack(false)
 			if err != nil {
+				if err := res.Nack(false, true); err != nil {
+					logger.Logger.Error("消息确认失败", err)
+				}
 				logger.Logger.Error("消息确认失败", err)
-				return
+				continue
 			}
 		}
 	}()
