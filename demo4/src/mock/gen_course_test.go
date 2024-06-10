@@ -91,8 +91,9 @@ func TestPreheatMysql2Redis(t *testing.T) {
 
 // 手动补偿操作
 func TestHandlerDeadQueue(t *testing.T) {
+	channel, err := mq.Client.Channel()
 	//接收消息
-	results, err := mq.Client.Consume(
+	results, err := channel.Consume(
 		variable.DeadQueue,
 		variable.DeadRoutingKey,
 		false, // 关闭自动应答

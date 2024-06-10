@@ -7,7 +7,7 @@ import (
 	"select-course/demo4/src/utils/logger"
 )
 
-var Client *amqp.Channel
+var Client *amqp.Connection
 
 func init() {
 	// "amqp://" + rabbit.Username + ":" + rabbit.Password + "@" + rabbit.Host + ":" + strconv.Itoa(rabbit.Port) + "/" + rabbit.Vhost
@@ -23,11 +23,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	channel, err := conn.Channel()
-	if err != nil {
-		panic(err)
-	}
-	Client = channel
+
+	Client = conn
 
 	logger.Logger.Info("rabbitmq init success")
 

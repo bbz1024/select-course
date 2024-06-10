@@ -58,7 +58,6 @@ func MyCourseList(ctx *gin.Context) {
 	resp.Success(ctx, course)
 }
 
-// 添加公共函数以处理参数校验和错误响应
 func handleRequestError(ctx *gin.Context, err error) {
 	logger.Logger.WithContext(ctx).Info("参数校验失败", err)
 	resp.ParamErr(ctx)
