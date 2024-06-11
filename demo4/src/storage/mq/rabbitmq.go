@@ -2,6 +2,7 @@ package mq
 
 import (
 	"fmt"
+	"github.com/avast/retry-go"
 	"github.com/streadway/amqp"
 	"select-course/demo4/src/constant/config"
 	"select-course/demo4/src/utils/logger"
@@ -11,7 +12,6 @@ import (
 var Client *amqp.Connection
 
 func init() {
-	// "amqp://" + rabbit.Username + ":" + rabbit.Password + "@" + rabbit.Host + ":" + strconv.Itoa(rabbit.Port) + "/" + rabbit.Vhost
 	dns := fmt.Sprintf(
 		"amqp://%s:%s@%s:%d/%s",
 		config.EnvCfg.RabbitMQUser,
@@ -21,28 +21,17 @@ func init() {
 		config.EnvCfg.RabbitMQVhost,
 	)
 	// 等待rabbitmq启动完成
-	for {
+	if err := retry.Do(func() error {
 		conn, err := amqp.Dial(dns)
 		if err != nil {
-			time.Sleep(time.Millisecond * 100)
-			logger.Logger.Info("rabbitmq not ready, retry...", err)
-			continue
+			return err
 		}
-		err = conn.Close()
-		if err != nil {
-			panic(err)
-		}
-		logger.Logger.Info("rabbitmq ready")
-		break
-	}
-	conn, err := amqp.Dial(dns)
-
-	if err != nil {
+		Client = conn
+		return nil
+	}, retry.Attempts(5), retry.Delay(time.Second)); err != nil {
+		logger.Logger.Error("rabbitmq init fail")
 		panic(err)
 	}
-
-	Client = conn
-
 	logger.Logger.Info("rabbitmq init success")
 
 }

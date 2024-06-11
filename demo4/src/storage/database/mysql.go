@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"github.com/avast/retry-go"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -28,41 +29,32 @@ func init() {
 		config.EnvCfg.MysqlDatabase,
 	)
 	// 针对mysql未启动时，
-	for {
-		conn, err := gorm.Open(mysql.Open(dns), &gorm.Config{
-			Logger: getGormLogger(),
+	if err := retry.Do(func() error {
+		db, err := gorm.Open(mysql.New(mysql.Config{
+			DSN:                       dns,
+			DefaultStringSize:         256,   // string 类型字段的默认长度
+			DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
+			DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
+			DontSupportRenameColumn:   true,  // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
+			SkipInitializeWithVersion: false, // 根据版本自动配置
+
+		}), &gorm.Config{
+			Logger: getGormLogger(), // 打印日志
+			NamingStrategy: schema.NamingStrategy{
+				SingularTable: true, // 表明不加s
+			},
+			SkipDefaultTransaction: true,
 		})
 		if err != nil {
-			time.Sleep(time.Millisecond * 100)
-			logger2.Logger.Info("mysql not ready, retry...", err)
-			continue
+			logger2.Logger.Warning("try to connect mysql failed")
+			return err
 		}
-		// 关闭连接
-		sqlDB, _ := conn.DB()
-		_ = sqlDB.Close()
-		logger2.Logger.Info("mysql ready")
-		break
-
-	}
-	db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN:                       dns,
-		DefaultStringSize:         256,   // string 类型字段的默认长度
-		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
-		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
-		DontSupportRenameColumn:   true,  // 用 `change` 重命名列，MySQL 8 之前的数据库和 MariaDB 不支持重命名列
-		SkipInitializeWithVersion: false, // 根据版本自动配置
-
-	}), &gorm.Config{
-		Logger: getGormLogger(), // 打印日志
-		NamingStrategy: schema.NamingStrategy{
-			SingularTable: true, // 表明不加s
-		},
-		SkipDefaultTransaction: true,
-	})
-	if err != nil {
+		Client = db
+		return nil
+	}, retry.Attempts(10), retry.Delay(time.Second)); err != nil {
 		panic(err)
 	}
-	if err := db.AutoMigrate(
+	if err := Client.AutoMigrate(
 		models.Course{},
 		models.User{},
 		models.UserCourse{},
@@ -71,12 +63,11 @@ func init() {
 	); err != nil {
 		panic(err)
 	}
-	Client = db
-	sqlDB, _ := db.DB()
+	sqlDB, _ := Client.DB()
 	sqlDB.SetMaxIdleConns(config.EnvCfg.MysqlMaxIdleConns) // 设置连接池，空闲
 	sqlDB.SetMaxOpenConns(config.EnvCfg.MysqlMaxOpenConns) // 打开
 	sqlDB.SetConnMaxLifetime(time.Second * 300)
-
+	logger2.Logger.Info("mysql connect success")
 }
 func getGormLogger() logger.Interface {
 	var logMode logger.LogLevel
