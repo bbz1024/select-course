@@ -11,21 +11,41 @@ import (
 	"os"
 	"select-course/demo4/src/constant/config"
 	"select-course/demo4/src/models"
+	logger2 "select-course/demo4/src/utils/logger"
 	"time"
 )
 
 var Client *gorm.DB
 
 func init() {
+
+	dns := fmt.Sprintf(
+		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		config.EnvCfg.MysqlUser,
+		config.EnvCfg.MysqlPassword,
+		config.EnvCfg.MySqlHOST,
+		config.EnvCfg.MysqlPort,
+		config.EnvCfg.MysqlDatabase,
+	)
+	// 针对mysql未启动时，
+	for {
+		conn, err := gorm.Open(mysql.Open(dns), &gorm.Config{
+			Logger: getGormLogger(),
+		})
+		if err != nil {
+			time.Sleep(time.Millisecond * 100)
+			logger2.Logger.Info("mysql not ready, retry...", err)
+			continue
+		}
+		// 关闭连接
+		sqlDB, _ := conn.DB()
+		_ = sqlDB.Close()
+		logger2.Logger.Info("mysql ready")
+		break
+
+	}
 	db, err := gorm.Open(mysql.New(mysql.Config{
-		DSN: fmt.Sprintf(
-			"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-			config.EnvCfg.MysqlUser,
-			config.EnvCfg.MysqlPassword,
-			config.EnvCfg.MySqlHOST,
-			config.EnvCfg.MysqlPort,
-			config.EnvCfg.MysqlDatabase,
-		),
+		DSN:                       dns,
 		DefaultStringSize:         256,   // string 类型字段的默认长度
 		DisableDatetimePrecision:  true,  // 禁用 datetime 精度，MySQL 5.6 之前的数据库不支持
 		DontSupportRenameIndex:    true,  // 重命名索引时采用删除并新建的方式，MySQL 5.7 之前的数据库和 MariaDB 不支持重命名索引
@@ -55,7 +75,7 @@ func init() {
 	sqlDB, _ := db.DB()
 	sqlDB.SetMaxIdleConns(config.EnvCfg.MysqlMaxIdleConns) // 设置连接池，空闲
 	sqlDB.SetMaxOpenConns(config.EnvCfg.MysqlMaxOpenConns) // 打开
-	sqlDB.SetConnMaxLifetime(time.Second * 30)
+	sqlDB.SetConnMaxLifetime(time.Second * 300)
 
 }
 func getGormLogger() logger.Interface {

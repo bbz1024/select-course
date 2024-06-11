@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"select-course/demo4/src/constant/config"
 	"select-course/demo4/src/utils/bloom"
 	"select-course/demo4/src/utils/consumer"
@@ -11,7 +12,7 @@ import (
 func main() {
 	r := router.InitApiRouter()
 	Initialize()
-	err := r.Run(":" + config.EnvCfg.ServerPort)
+	err := r.Run(fmt.Sprintf(":%d", config.EnvCfg.ServerPort))
 	if err != nil {
 		panic(err)
 	}

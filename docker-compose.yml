@@ -1,0 +1,58 @@
+version: "3.9"
+services:
+  redis:
+    image: redis:6-alpine
+    volumes:
+      - Course-RDB:/var/lib/redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - Course
+    env_file:
+      - .env
+  mysql:
+    image: mysql:8.0-debian
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    env_file:
+      - .env
+    networks:
+      - Course
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - Course
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - Course-Rabbitmq:/var/lib/rabbitmq
+  app:
+    build:
+      context: .
+    ports:
+      - "8888:8888"
+    command: [ "./app" ]
+    networks:
+      - Course
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+    volumes:
+      - .env:/project/.env
+    env_file:
+      - .env
+networks:
+  Course:
+    driver: bridge
+volumes:
+  Course-RDB:
+  Course-Mysql:
+  Course-Rabbitmq:

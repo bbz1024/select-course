@@ -20,23 +20,6 @@ import (
 	"testing"
 )
 
-func TestInsertCourse(t *testing.T) {
-	// 星期一 上午 08:10 ~ 11:50 | 星期二 下午 14:10 ~ 16:50 | 星期三 晚上 18:50 ~ 21:20
-	var course []models.Course
-	for i := 1; i < 11; i++ {
-		course = append(course, models.Course{
-			BaseModel: models.BaseModel{
-				ID: uint(i),
-			},
-			Title:      fmt.Sprintf("课程%d", i),
-			CategoryID: uint(rand.Intn(5) + 1),
-			ScheduleID: uint(rand.Intn(15) + 1),
-			Capacity:   uint(rand.Intn(10) + 1),
-		})
-	}
-	database.Client.Create(&course)
-
-}
 func TestInsertSchedule(t *testing.T) {
 	var schedule []models.Schedule
 	week := 5
@@ -64,6 +47,23 @@ func TestInsertCourseCategory(t *testing.T) {
 		})
 	}
 	database.Client.Create(&courseCategory)
+}
+func TestInsertCourse(t *testing.T) {
+	// 星期一 上午 08:10 ~ 11:50 | 星期二 下午 14:10 ~ 16:50 | 星期三 晚上 18:50 ~ 21:20
+	var course []models.Course
+	for i := 1; i < 11; i++ {
+		course = append(course, models.Course{
+			BaseModel: models.BaseModel{
+				ID: uint(i),
+			},
+			Title:      fmt.Sprintf("课程%d", i),
+			CategoryID: uint(rand.Intn(5) + 1),
+			ScheduleID: uint(rand.Intn(15) + 1),
+			Capacity:   uint(rand.Intn(10) + 1),
+		})
+	}
+	database.Client.Create(&course)
+
 }
 
 // 预热到redis

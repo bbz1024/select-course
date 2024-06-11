@@ -10,7 +10,7 @@ var RDB *redis.Client
 
 func init() {
 	RDB = redis.NewClient(&redis.Options{
-		Addr:           fmt.Sprintf("%s:%s", config.EnvCfg.RedisHost, config.EnvCfg.RedisPort),
+		Addr:           fmt.Sprintf("%s:%d", config.EnvCfg.RedisHost, config.EnvCfg.RedisPort),
 		Password:       config.EnvCfg.RedisPwd,
 		DB:             config.EnvCfg.RedisDb,
 		MaxIdleConns:   config.EnvCfg.RedisMaxIdleConns,

@@ -3,6 +3,7 @@ module select-course
 go 1.20
 
 require (
+	github.com/avast/retry-go v2.7.0+incompatible
 	github.com/bits-and-blooms/bloom/v3 v3.7.0
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/gin-gonic/gin v1.10.0
@@ -15,7 +16,6 @@ require (
 )
 
 require (
-	github.com/avast/retry-go v2.7.0+incompatible // indirect
 	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
