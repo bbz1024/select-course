@@ -3,7 +3,7 @@ services:
   redis:
     image: redis:6-alpine
     volumes:
-      - Course-RDB:/var/lib/redis
+      - ./redis.conf:/etc/redis/redis.conf
     ports:
       - "6379:6379"
     restart: unless-stopped
@@ -11,6 +11,7 @@ services:
       - Course
     env_file:
       - .env
+    command: [ "redis-server", "/etc/redis/redis.conf" ]
   mysql:
     image: mysql:8.0-debian
     ports:
@@ -49,6 +50,36 @@ services:
       - .env:/project/.env
     env_file:
       - .env
+  app2:
+    build:
+      context: .
+    ports:
+      - "8889:8888"
+    command: [ "./app" ]
+    networks:
+      - Course
+    depends_on:
+      - mysql
+      - redis
+      - rabbitmq
+    volumes:
+      - .env:/project/.env
+    env_file:
+      - .env
+  nginx:
+    image: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.balancer.conf:/etc/nginx/nginx.conf
+#      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - Course
+    depends_on:
+      - app
+      - app2
+
 networks:
   Course:
     driver: bridge

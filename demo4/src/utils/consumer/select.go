@@ -35,14 +35,13 @@ func InitSelectListener() error {
 	}
 	err = SelectConsumer.Declare()
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
-	SelectConsumer.Consumer()
 	return nil
-
 }
-
+func (s *Select) Close() error {
+	return s.channel.Close()
+}
 func (s *Select) Declare() error {
 
 	var err error
@@ -139,7 +138,7 @@ func (s *Select) ListenReturns() {
 		}
 	}
 }
-func (s *Select) Consumer() {
+func (s *Select) Consumer() error {
 	results, err := SelectConsumer.channel.Consume(
 		variable.SelectQueue,
 		variable.SelectRoutingKey,
@@ -151,60 +150,60 @@ func (s *Select) Consumer() {
 	)
 	if err != nil {
 		logger.Logger.Error("消息接收失败", err)
-		return
+		return err
 	}
 
-	go func() {
-		for res := range results {
-			var msg *mqm.CourseReq
-			err := json.Unmarshal(res.Body, &msg)
-			if err != nil {
-				logger.Logger.Error("消息反序列化失败", err)
-				res.Reject(false)
-				continue
-			}
-
-			err = database.Client.Transaction(func(tx *gorm.DB) error {
-				switch msg.Type {
-				case mqm.SelectType:
-					if err := updateCourseCapacity(tx, msg, true); err != nil {
-						return err
-					}
-					if err := updateUserFlag(tx, msg, true); err != nil {
-						return err
-					}
-					if err := updateUserCourseState(tx, msg, true); err != nil {
-						return err
-					}
-				case mqm.BackType:
-					if err := updateCourseCapacity(tx, msg, false); err != nil {
-						return err
-					}
-					if err := updateUserFlag(tx, msg, false); err != nil {
-						return err
-					}
-					if err := updateUserCourseState(tx, msg, false); err != nil {
-						return err
-					}
-
-				default:
-					return fmt.Errorf("未知的消息类型: %d", msg.Type)
-				}
-				return nil
-			})
-
-			if err != nil {
-				logger.Logger.Error("事务失败", err)
-				res.Reject(false)
-				continue
-			}
-
-			// 消息确认
-			if err := res.Ack(false); err != nil {
-				logger.Logger.Error("消息确认失败", err)
-			}
+	for res := range results {
+		var msg *mqm.CourseReq
+		err := json.Unmarshal(res.Body, &msg)
+		if err != nil {
+			logger.Logger.Error("消息反序列化失败", err)
+			res.Reject(false)
+			continue
 		}
-	}()
+
+		err = database.Client.Transaction(func(tx *gorm.DB) error {
+			switch msg.Type {
+			case mqm.SelectType:
+				if err := updateCourseCapacity(tx, msg, true); err != nil {
+					return err
+				}
+				if err := updateUserFlag(tx, msg, true); err != nil {
+					return err
+				}
+				if err := updateUserCourseState(tx, msg, true); err != nil {
+					return err
+				}
+			case mqm.BackType:
+				if err := updateCourseCapacity(tx, msg, false); err != nil {
+					return err
+				}
+				if err := updateUserFlag(tx, msg, false); err != nil {
+					return err
+				}
+				if err := updateUserCourseState(tx, msg, false); err != nil {
+					return err
+				}
+
+			default:
+				return fmt.Errorf("未知的消息类型: %d", msg.Type)
+			}
+			return nil
+		})
+
+		if err != nil {
+			logger.Logger.Error("事务失败", err)
+			res.Reject(false)
+			continue
+		}
+
+		// 消息确认
+		if err := res.Ack(false); err != nil {
+			logger.Logger.Error("消息确认失败", err)
+		}
+	}
+	return nil
+
 }
 
 // 更新课程容量

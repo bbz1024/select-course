@@ -39,7 +39,7 @@ type envConfig struct {
 	RabbitMQPort     int    `env:"RABBITMQ_DEFAULT_PORT" envDefault:"5672"`
 	RabbitMQUser     string `env:"RABBITMQ_DEFAULT_USER" envDefault:"guest"`
 	RabbitMQPassword string `env:"RABBITMQ_DEFAULT_PASS" envDefault:"guest"`
-	RabbitMQVhost    string `env:"RABBITMQ_DEFAULT_VHOST" envDefault:""`
+	RabbitMQVhost    string `env:"RABBITMQ_DEFAULT_VHOST" envDefault:"/"`
 }
 
 var path = ".env.dev"

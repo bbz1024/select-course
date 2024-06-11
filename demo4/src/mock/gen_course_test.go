@@ -59,7 +59,7 @@ func TestInsertCourse(t *testing.T) {
 			Title:      fmt.Sprintf("课程%d", i),
 			CategoryID: uint(rand.Intn(5) + 1),
 			ScheduleID: uint(rand.Intn(15) + 1),
-			Capacity:   uint(rand.Intn(10) + 1),
+			Capacity:   10,
 		})
 	}
 	database.Client.Create(&course)

@@ -38,7 +38,7 @@ type Course struct {
 	ScheduleID uint      `json:"ScheduleID" gorm:"not null;comment:分类ID"`
 	Schedule   *Schedule `json:"schedule" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程时间"`
 	// 容纳人数
-	Capacity uint `json:"capacity" gorm:"type:int;not null;comment:容纳人数"`
+	Capacity int `json:"capacity" gorm:"type:int;not null;comment:容纳人数"`
 }
 
 type Schedule struct {
