@@ -31,6 +31,6 @@ func CalOffset(courseID uint) (offset int, err error) {
 	if !ok {
 		return 0, fmt.Errorf("courseID %d not found", courseID)
 	}
-	offset = int(model.Week)*3 + model.Duration
+	offset = int(model.Week)*3 + model.Duration - 1
 	return offset, nil
 }

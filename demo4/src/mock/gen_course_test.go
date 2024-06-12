@@ -176,7 +176,7 @@ func updateUserFlag(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
 		logger.Logger.Debug("获取用户信息", err)
 		return fmt.Errorf("用户ID: %d 不存在", msg.UserID)
 	}
-
+	offset -= 1
 	if selectAction {
 		user.Flag.SetBit(offset)
 	} else {

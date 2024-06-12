@@ -71,7 +71,7 @@ func init() {
 }
 func getGormLogger() logger.Interface {
 	var logMode logger.LogLevel
-	switch config.EnvCfg.MysqlLogLevel {
+	switch config.EnvCfg.LoggerLevel {
 	case "SILENT":
 		logMode = logger.Silent
 	case "ERROR":
@@ -84,10 +84,10 @@ func getGormLogger() logger.Interface {
 		logMode = logger.Info
 	}
 	return logger.New(getGormLogWriter(), logger.Config{
-		SlowThreshold:             200 * time.Millisecond, // 慢 SQL 阈值
-		LogLevel:                  logMode,                // 日志级别
-		IgnoreRecordNotFoundError: false,                  // 忽略ErrRecordNotFound（记录未找到）错误
-		Colorful:                  false,                  // 禁用彩色打印
+		//SlowThreshold:             500 * time.Millisecond, // 慢 SQL 阈值
+		LogLevel:                  logMode, // 日志级别
+		IgnoreRecordNotFoundError: true,    // 忽略ErrRecordNotFound（记录未找到）错误
+		Colorful:                  false,   // 禁用彩色打印
 	})
 }
 

@@ -11,14 +11,15 @@ import (
 func InitApiRouter() *gin.Engine {
 	var router *gin.Engine
 	if config.EnvCfg.ProjectMode == "dev" {
-		gin.SetMode(gin.DebugMode)
-		gin.ForceConsoleColor()
-		router = gin.Default()
-
+		//gin.SetMode(gin.DebugMode)
+		//gin.ForceConsoleColor()
+		//router = gin.Default()
+		gin.SetMode(gin.ReleaseMode)
+		router = gin.New()
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 		router = gin.New()
-		router.Use(gin.Logger())
+		//router.Use(gin.Logger())
 	}
 	v1 := router.Group("api/v1")
 	v1.Use(middleware.Auth)

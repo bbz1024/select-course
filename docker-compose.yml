@@ -34,9 +34,8 @@ services:
     restart: unless-stopped
     volumes:
       - Course-Rabbitmq:/var/lib/rabbitmq
-  app:
-    build:
-      context: .
+  app1:
+    image: select-course
     ports:
       - "8888:8888"
     command: [ "./app" ]
@@ -51,8 +50,7 @@ services:
     env_file:
       - .env
   app2:
-    build:
-      context: .
+    image: select-course
     ports:
       - "8889:8888"
     command: [ "./app" ]
@@ -77,7 +75,7 @@ services:
     networks:
       - Course
     depends_on:
-      - app
+      - app1
       - app2
 
 networks:

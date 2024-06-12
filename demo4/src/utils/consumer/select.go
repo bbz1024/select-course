@@ -21,11 +21,9 @@ import (
 var SelectConsumer *Select
 
 type Select struct {
-	channel *amqp.Channel
-	//	 发布确认
+	channel    *amqp.Channel
 	confirmMsg chan amqp.Confirmation
-	// return
-	returnMsg chan amqp.Return
+	returnMsg  chan amqp.Return
 }
 
 func InitSelectListener() error {
@@ -90,14 +88,17 @@ func (s *Select) Declare() error {
 	}
 	s.confirmMsg = s.channel.NotifyPublish(make(chan amqp.Confirmation))
 	s.returnMsg = s.channel.NotifyReturn(make(chan amqp.Return))
-	go s.ListenConfirm() // 无法到达交换机、或者消息路由成功
+	go s.ListenConfirm() // 无法到达交换机
 	go s.ListenReturns() // 无法路由到正确队列或者路由键规则匹配
 	return nil
 }
 func (s *Select) ListenConfirm() {
+	// 但是消息存储到了Broker中
 	for msg := range s.confirmMsg {
-		// 无法达到交换机
-		fmt.Println(msg)
+		if !msg.Ack {
+			logger.Logger.Error("无法正确到路由队列")
+			s.channel.Reject(msg.DeliveryTag, false)
+		}
 	}
 }
 
@@ -155,43 +156,23 @@ func (s *Select) Consumer() error {
 
 	for res := range results {
 		var msg *mqm.CourseReq
-		err := json.Unmarshal(res.Body, &msg)
-		if err != nil {
+		if err := json.Unmarshal(res.Body, &msg); err != nil {
 			logger.Logger.Error("消息反序列化失败", err)
 			res.Reject(false)
 			continue
 		}
-
-		err = database.Client.Transaction(func(tx *gorm.DB) error {
-			switch msg.Type {
-			case mqm.SelectType:
-				if err := updateCourseCapacity(tx, msg, true); err != nil {
-					return err
-				}
-				if err := updateUserFlag(tx, msg, true); err != nil {
-					return err
-				}
-				if err := updateUserCourseState(tx, msg, true); err != nil {
-					return err
-				}
-			case mqm.BackType:
-				if err := updateCourseCapacity(tx, msg, false); err != nil {
-					return err
-				}
-				if err := updateUserFlag(tx, msg, false); err != nil {
-					return err
-				}
-				if err := updateUserCourseState(tx, msg, false); err != nil {
-					return err
-				}
-
-			default:
-				return fmt.Errorf("未知的消息类型: %d", msg.Type)
+		if err = database.Client.Transaction(func(tx *gorm.DB) error {
+			if err := updateCourseCapacity(tx, msg, msg.Type == mqm.SelectType); err != nil {
+				return err
+			}
+			if err := updateUserFlag(tx, msg, msg.Type == mqm.SelectType); err != nil {
+				return err
+			}
+			if err := updateUserCourseState(tx, msg, msg.Type == mqm.SelectType); err != nil {
+				return err
 			}
 			return nil
-		})
-
-		if err != nil {
+		}); err != nil {
 			logger.Logger.Error("事务失败", err)
 			res.Reject(false)
 			continue
@@ -233,11 +214,11 @@ func updateUserFlag(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
 	}
 	// 3. 获取用户flag，更新flag
 	var user models.User
-	if err := database.Client.Where("id=?", msg.UserID).First(&user).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id=?", msg.UserID).First(&user).Error; err != nil {
 		logger.Logger.Debug("获取用户信息", err)
 		return fmt.Errorf("用户ID: %d 不存在", msg.UserID)
 	}
-
 	if selectAction {
 		user.Flag.SetBit(offset)
 	} else {
@@ -253,17 +234,18 @@ func updateUserFlag(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
 // 创建用户选课记录
 func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
 	var userCourse models.UserCourse
-	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).
-		Where("user_id=? and course_id=? ", msg.UserID, msg.CourseID).
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("user_id=? and course_id=?", msg.UserID, msg.CourseID).
 		First(&userCourse).Error; err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Logger.Info("获取用户选课记录失败", err)
 			return err
 		}
-		// 不存在
+		// 不存在，则创建
 		if err := tx.Create(&models.UserCourse{
 			UserID:    msg.UserID,
 			CourseID:  msg.CourseID,
-			CreatedAt: msg.CreatedAt, // 创建时记录创建时间
+			CreatedAt: msg.CreatedAt,
 			IsDeleted: !selectAction,
 		}).Error; err != nil {
 			logger.Logger.Info("创建选课记录失败", err)
@@ -271,11 +253,11 @@ func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) e
 		}
 		return nil
 	}
-	// 存在，还是判断msg是否在创建时间之前，不在的话，不更新。
-	if err := tx.Model(&models.UserCourse{}).
+	// 记录已存在，检查并可能更新
+	updateData := map[string]interface{}{"is_deleted": !selectAction}
+	if err := tx.Model(&userCourse).
 		Where("user_id=? and course_id=? and created_at < ?", msg.UserID, msg.CourseID, msg.CreatedAt).
-		Update("is_deleted", !selectAction).
-		Update("created_at", msg.CreatedAt).Error; err != nil {
+		Updates(updateData).Error; err != nil {
 		logger.Logger.Info("更新选课记录失败", err)
 		return err
 	}
@@ -283,23 +265,30 @@ func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) e
 }
 
 func (s *Select) Product(msg *mqm.CourseReq) {
-	// 毫秒 记录每条消息的时间,确保加入到死信队列后期执行消费的顺序
-	msg.CreatedAt = time.Now().UnixMilli()
+	// 微妙 记录每条消息的时间,确保加入到死信队列后期执行消费的顺序
+	msg.CreatedAt = time.Now().UnixMicro()
 	bytes, err := json.Marshal(msg)
 	if err != nil {
 		logger.Logger.Error("消息序列化失败", err)
 		return
 	}
-	err = s.channel.Publish(
-		variable.SelectExchange,
-		variable.SelectRoutingKey,
-		true,
-		false, amqp.Publishing{
-			ContentType: "text/plain",
-			Body:        bytes,
-		})
-	if err != nil {
-		logger.Logger.Error("消息发送失败", err)
-		return
+	var cnt uint8
+	if err := retry.Do(func() error {
+		if err = s.channel.Publish(
+			variable.SelectExchange,
+			variable.SelectRoutingKey,
+			true,
+			false, amqp.Publishing{
+				ContentType: "text/plain",
+				Body:        bytes,
+			}); err != nil {
+			cnt++
+			logger.Logger.Errorf("消息发送失败,尝试次数: %d", cnt)
+			return err
+		}
+		return nil
+	}, retry.Attempts(3), retry.Delay(time.Millisecond*100)); err != nil {
+		logger.Logger.Error("尝试消息发送失败", err)
 	}
+
 }
