@@ -27,13 +27,21 @@ func TestInsertSchedule(t *testing.T) {
 	for i := 0; i < week; i++ {
 		for j := 1; j <= duration; j++ {
 			schedule = append(schedule, models.Schedule{
+				BaseModel: models.BaseModel{
+					ID: uint(i*duration + j),
+				},
 				Week:     models.Week(i),
 				Duration: models.Duration(j),
 			})
 		}
 	}
-	fmt.Println(schedule)
-	database.Client.Create(&schedule)
+	// 清空数据库
+	if err := database.Client.Where("1=1").Delete(&models.Schedule{}).Error; err != nil {
+		t.Error(err)
+	}
+	if err := database.Client.Create(&schedule).Error; err != nil {
+		t.Error(err)
+	}
 
 }
 func TestInsertCourseCategory(t *testing.T) {
@@ -46,7 +54,12 @@ func TestInsertCourseCategory(t *testing.T) {
 			},
 		})
 	}
-	database.Client.Create(&courseCategory)
+	if err := database.Client.Where("1=1").Delete(&models.CourseCategory{}).Error; err != nil {
+		t.Error(err)
+	}
+	if err := database.Client.Create(&courseCategory).Error; err != nil {
+		t.Error(err)
+	}
 }
 func TestInsertCourse(t *testing.T) {
 	// 星期一 上午 08:10 ~ 11:50 | 星期二 下午 14:10 ~ 16:50 | 星期三 晚上 18:50 ~ 21:20
@@ -62,7 +75,12 @@ func TestInsertCourse(t *testing.T) {
 			Capacity:   10,
 		})
 	}
-	database.Client.Create(&course)
+	if err := database.Client.Where("1=1").Delete(&models.Course{}).Error; err != nil {
+		t.Error(err)
+	}
+	if err := database.Client.Create(&course).Error; err != nil {
+		t.Error(err)
+	}
 
 }
 
@@ -234,4 +252,38 @@ func TestTotalRedisCourse(t *testing.T) {
 		total += int(v)
 	}
 	fmt.Println(total)
+}
+
+// 测试数据一致性
+func TestValidDataConsistency(t *testing.T) {
+	var userCourse []models.UserCourse
+	if err := database.Client.
+		Where("is_deleted=?", false).
+		Order("user_id").
+		Find(&userCourse).
+		Error; err != nil {
+		t.Error(err)
+	}
+	for i := 0; i < len(userCourse); i++ {
+		// 判断用户是否在set里
+		if !cache.RDB.SIsMember(
+			context.Background(),
+			fmt.Sprintf(keys.UserCourseSetKey, userCourse[i].UserID),
+			userCourse[i].CourseID).Val() {
+			fmt.Println(userCourse[i].UserID, userCourse[i].CourseID)
+			t.Error("数据不一致")
+		}
+	}
+}
+
+// 测试数据
+
+func TestGenerateData(t *testing.T) {
+	TestInsertUsers(t)
+	TestInsertCourse(t)
+	if err := cache.RDB.FlushDB(context.Background()).Err(); err != nil {
+		t.Error(err)
+	}
+	TestPreheatMysql2Redis(t)
+
 }

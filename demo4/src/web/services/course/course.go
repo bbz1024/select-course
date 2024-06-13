@@ -99,7 +99,6 @@ func SelectCourse(ctx *gin.Context) {
 
 	offset, err := local.CalOffset(req.CourseID)
 	validateAndLogError(ctx, err, code.Fail, "获取课程时间失败")
-
 	val, err := executeLuaScript(ctx, cache.RDB, redis.NewScript(lua.CourseSelectLuaScript), []string{
 		fmt.Sprintf(keys.UserCourseSetKey, req.UserID),
 		strconv.Itoa(int(req.CourseID)),
@@ -107,25 +106,29 @@ func SelectCourse(ctx *gin.Context) {
 		keys.CourseCapacityKey,
 		fmt.Sprintf(keys.UserCourseScheduleBitMapKey, req.UserID),
 		strconv.Itoa(offset),
+		keys.CourseSequenceKey,
 	}, req.UserID, req.CourseID)
 	if err != nil {
 		logger.Logger.WithContext(ctx).Warning("执行lua脚本失败", err)
 		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 		return
 	}
-
-	switch val.(int64) {
-	case lua.CourseSelectOK:
+	res := val.(int64)
+	switch {
+	case res >= lua.CourseOptOK:
 		logger.Logger.WithContext(ctx).Info("选课成功")
-		consumer.SelectConsumer.Product(&mqm.CourseReq{UserID: req.UserID, CourseID: req.CourseID, Type: mqm.SelectType})
+		consumer.SelectConsumer.Product(&mqm.CourseReq{
+			UserID: req.UserID, CourseID: req.CourseID, Type: mqm.SelectType,
+			CreatedAt: res,
+		})
 		resp.Success(ctx, nil)
-	case lua.CourseSelected:
+	case res == lua.CourseSelected:
 		logger.Logger.WithContext(ctx).Info("用户已经选择该门课程")
 		resp.Fail(ctx, code.Fail, code.CourseSelected, code.CourseSelectedMsg)
-	case lua.CourseFull:
+	case res == lua.CourseFull:
 		logger.Logger.WithContext(ctx).Info("课程已满")
 		resp.Fail(ctx, code.Fail, code.CourseFull, code.CourseFullMsg)
-	case lua.CourseTimeConflict:
+	case res == lua.CourseTimeConflict:
 		logger.Logger.WithContext(ctx).Info("课程时间冲突")
 		resp.Fail(ctx, code.Fail, code.CourseTimeConflict, code.CourseTimeConflictMsg)
 	default:
@@ -143,7 +146,6 @@ func BackCourse(ctx *gin.Context) {
 
 	offset, err := local.CalOffset(req.CourseID)
 	validateAndLogError(ctx, err, code.Fail, "计算offset失败")
-
 	val, err := executeLuaScript(ctx, cache.RDB, redis.NewScript(lua.CourseBackLuaScript), []string{
 		fmt.Sprintf(keys.UserCourseSetKey, req.UserID),
 		strconv.Itoa(int(req.CourseID)),
@@ -151,22 +153,24 @@ func BackCourse(ctx *gin.Context) {
 		keys.CourseCapacityKey,
 		fmt.Sprintf(keys.UserCourseScheduleBitMapKey, req.UserID),
 		strconv.Itoa(offset),
+		keys.CourseSequenceKey,
 	}, req.UserID, req.CourseID)
 	if err != nil {
 		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 		return
 	}
-
-	switch val.(int64) {
-	case lua.CourseBackOK:
+	res := val.(int64)
+	switch {
+	case res >= lua.CourseOptOK:
 		logger.Logger.WithContext(ctx).Info("退课成功")
 		consumer.SelectConsumer.Product(&mqm.CourseReq{
-			UserID:   req.UserID,
-			CourseID: req.CourseID,
-			Type:     mqm.BackType,
+			UserID:    req.UserID,
+			CourseID:  req.CourseID,
+			Type:      mqm.BackType,
+			CreatedAt: res,
 		})
 		resp.Success(ctx, nil)
-	case lua.CourseNotSelected:
+	case res == lua.CourseNotSelected:
 		logger.Logger.WithContext(ctx).Info("退课失败：课程未选择")
 		resp.Fail(ctx, code.Fail, code.CourseNotSelected, code.CourseNotSelectedMsg)
 	default:

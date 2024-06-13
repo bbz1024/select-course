@@ -83,6 +83,7 @@ func getGormLogger() logger.Interface {
 	default:
 		logMode = logger.Info
 	}
+	fmt.Println(logMode)
 	return logger.New(getGormLogWriter(), logger.Config{
 		//SlowThreshold:             500 * time.Millisecond, // 慢 SQL 阈值
 		LogLevel:                  logMode, // 日志级别

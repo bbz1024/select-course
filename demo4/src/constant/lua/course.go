@@ -4,10 +4,11 @@ package lua
 // 2. 用户是否已经选择了
 
 const (
-	CourseSelectOK = iota
+	CourseFull = iota - 4
 	CourseSelected
 	CourseTimeConflict
-	CourseFull
+	CourseNotSelected
+	CourseOptOK
 	/*
 		CourseSelectLuaScript lua
 			key1 = 用户key
@@ -16,18 +17,19 @@ const (
 			key4 = capacity key
 			key5 = user course schedule key
 			key6 = offset
+			key7 = sequence
 	*/
 	CourseSelectLuaScript = `
 
 	-- 1. 用户是否已经选择了
 	if redis.call("sismember", KEYS[1], KEYS[2]) == 1 then
-		return 1 
+		return -3 
 	end	
 
     -- 2. 是否存在时间冲突 判断某个时间段是否为1
     local bitmap = tonumber(redis.call("getbit", KEYS[5], KEYS[6]))
     if bitmap and bitmap == 1 then
-        return 2
+        return -2
     end
 	
 	-- 3. 选课操作
@@ -39,14 +41,15 @@ const (
 		redis.call("sadd", KEYS[1], KEYS[2])
 		-- 课程时间段设置为1
 		redis.call("setbit", KEYS[5], KEYS[6], 1) 
-		return 0
+		-- 课程序列号加一
+		local sequence=tonumber(redis.call("incr", KEYS[7]))
+		return sequence
 	else
 		-- 容量满了
-		return 3
+		return -4
 	end
 `
-	CourseBackOK      = 0
-	CourseNotSelected = 1
+
 	/*
 		CourseBackLuaScript
 		key1 = 用户key
@@ -55,6 +58,7 @@ const (
 		key4 = capacity key
 		key5 = user course schedule key
 		key6 = offset
+		key7 = sequence
 	*/
 
 	CourseBackLuaScript = `
@@ -66,9 +70,10 @@ const (
 		redis.call("srem", KEYS[1], KEYS[2])
 		-- 课程时间段设置为0
 		redis.call("setbit", KEYS[5], KEYS[6], 0)
-		return 0
+		local sequence=tonumber(redis.call("incr", KEYS[7]))
+		return sequence
 	else
-		return 1
+		return -1
 	end
 `
 )

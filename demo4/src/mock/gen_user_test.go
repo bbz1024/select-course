@@ -20,7 +20,13 @@ func TestInsertUsers(t *testing.T) {
 			Password:  "password" + strconv.Itoa(i),
 		})
 	}
-	database.Client.Create(users)
+	// 清空
+	if err := database.Client.Where("1=1").Delete(&models.User{}).Error; err != nil {
+		t.Error(err)
+	}
+	if err := database.Client.Create(&users).Error; err != nil {
+		t.Error(err)
+	}
 }
 func TestInsertUsersRedis(t *testing.T) {
 	var users []models.User

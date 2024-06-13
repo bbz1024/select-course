@@ -111,56 +111,11 @@ func (s *Select) Declare() error {
 }
 func (s *Select) ListenConfirm() {
 	for msg := range s.confirmMsg {
+		fmt.Println(msg.DeliveryTag)
 		if TestMsgLose {
 			cache.RDB.HIncrBy(context.Background(), "record", "total", 1)
 		}
-		fmt.Println(msg.DeliveryTag)
-		if !msg.Ack {
-			if TestMsgLose {
-				cache.RDB.HIncrBy(context.Background(), "record", "ack-fail", 1)
-			}
-			val, ok := s.unconfirmedMessages.Load(msg.DeliveryTag)
-			if !ok {
-				logger.Logger.Error("消息确认失败", msg)
-				continue
-			}
-			data := val.(UnconfirmedMessage)
-			// 重新发送，尝试3次
-			var cnt int
-			if err := retry.Do(func() error {
-				if err := s.channel.Publish(
-					variable.SelectExchange,
-					variable.SelectRoutingKey,
-					true,
-					false,
-					amqp.Publishing{
-						ContentType: "text/plain",
-						Body:        data.Body,
-					},
-				); err != nil {
-					cnt++
-					logger.Logger.Error("消息发送失败%d次", cnt)
-					return err
-				}
-				return nil
-			}, retry.Attempts(3), retry.Delay(time.Millisecond*100)); err != nil {
-				logger.Logger.Error("消息重新发送失败", err)
-				// 丢入到死信队列，进行补偿操作
-				if err := s.channel.Publish(
-					variable.DeadExchange,
-					variable.DeadRoutingKey,
-					true,
-					false,
-					amqp.Publishing{
-						ContentType: "text/plain",
-						Body:        data.Body,
-					},
-				); err != nil {
-					logger.Logger.Error("消息发送失败", err)
-				}
-			}
-		}
-		s.unconfirmedMessages.Delete(msg.DeliveryTag)
+
 	}
 }
 
@@ -221,7 +176,7 @@ func (s *Select) Consumer() error {
 		logger.Logger.Error("消息接收失败", err)
 		return err
 	}
-
+	//time.Sleep(time.Second * 20)
 	for res := range results {
 		if TestMsgLose {
 			cache.RDB.HIncrBy(context.Background(), "record", "consume-total", 1)
@@ -240,6 +195,8 @@ func (s *Select) Consumer() error {
 
 			continue
 		}
+		//time.Sleep(time.Millisecond * 500)
+		//fmt.Println(msg)
 		if err = database.Client.Transaction(func(tx *gorm.DB) error {
 			if err := updateCourseCapacity(tx, msg, msg.Type == mqm.SelectType); err != nil {
 				return err
@@ -350,32 +307,22 @@ func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) e
 		}
 		return nil
 	}
-	// 消息时间小于记录时间，则不更新（失效）
-	if msg.CreatedAt < userCourse.UpdatedAt {
-		/*
-			消息失效了，但是在redis已经进行了扣减操作，那么只需要进行归还库存和置位清零操作
-		*/
-		return nil
-		//return errors.New("消息失效")
-	}
-
-	// 记录已存在，检查并可能更新
-	updateData := map[string]interface{}{"is_deleted": !selectAction, "updated_at": msg.CreatedAt}
-	if err := tx.Model(&userCourse).
-		Where("user_id=? and course_id=? ", msg.UserID, msg.CourseID).
-		Updates(updateData).Error; err != nil {
-		logger.Logger.Error("更新选课记录失败", err)
-		return err
+	// 消息时间大于记录时间，则更新，否则就是为失效消息（过期）
+	if msg.CreatedAt > userCourse.UpdatedAt {
+		// 记录已存在，检查并可能更新
+		updateData := map[string]interface{}{"is_deleted": !selectAction, "updated_at": msg.CreatedAt}
+		if err := tx.Model(&userCourse).
+			Where("user_id=? and course_id=? ", msg.UserID, msg.CourseID).
+			Updates(updateData).Error; err != nil {
+			logger.Logger.Error("更新选课记录失败", err)
+			return err
+		}
 	}
 	return nil
-
 }
 
 func (s *Select) Product(msg *mqm.CourseReq) {
-	s.cnt.Add(1)
-	msg.CreatedAt = s.cnt.Load()
 	bytes, err := json.Marshal(msg)
-
 	if err != nil {
 		logger.Logger.Error("消息序列化失败", err)
 		return
@@ -399,15 +346,23 @@ func (s *Select) Product(msg *mqm.CourseReq) {
 			logger.Logger.Warningf("消息发送失败,尝试次数: %d", cnt)
 			return err
 		}
-		// 记录消息，以便于消息确认
-		s.unconfirmedMessages.Store(cnt, UnconfirmedMessage{
-			Body:       bytes,
-			Exchange:   variable.SelectExchange,
-			RoutingKey: variable.SelectRoutingKey,
-		})
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*100)); err != nil {
 		logger.Logger.Error("尝试消息发送失败", err)
+		if TestMsgLose {
+			cache.RDB.HIncrBy(context.Background(), "record", "produce-fail", 1)
+		}
+		// 死信
+		if err := s.channel.Publish(
+			variable.DeadExchange,
+			variable.DeadRoutingKey,
+			true,
+			false, amqp.Publishing{
+				DeliveryMode: amqp.Persistent,
+				ContentType:  "application/json",
+				Body:         bytes,
+			}); err != nil {
+			logger.Logger.Error("死信消息发送失败", err)
+		}
 	}
-
 }
