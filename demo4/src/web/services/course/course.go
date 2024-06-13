@@ -66,7 +66,7 @@ func handleRequestError(ctx *gin.Context, err error) {
 
 func validateAndLogError(ctx *gin.Context, err error, failCode int, failMsg string) {
 	if err != nil {
-		logger.Logger.WithContext(ctx).Info(failMsg, err)
+		logger.Logger.WithContext(ctx).Warning(failMsg, err)
 		resp.Fail(ctx, failCode, failCode, failMsg)
 		return
 	}
@@ -75,7 +75,7 @@ func validateAndLogError(ctx *gin.Context, err error, failCode int, failMsg stri
 func executeLuaScript(ctx context.Context, rdb *redis.Client, script *redis.Script, keys []string, args ...interface{}) (interface{}, error) {
 	val, err := script.Run(ctx, rdb, keys, args...).Result()
 	if err != nil {
-		logger.Logger.WithContext(ctx).Info("执行lua脚本失败", err)
+		logger.Logger.WithContext(ctx).Warning("执行lua脚本失败", err)
 		return nil, err
 	}
 	return val, nil
@@ -109,7 +109,7 @@ func SelectCourse(ctx *gin.Context) {
 		strconv.Itoa(offset),
 	}, req.UserID, req.CourseID)
 	if err != nil {
-		logger.Logger.WithContext(ctx).Info("执行lua脚本失败", err)
+		logger.Logger.WithContext(ctx).Warning("执行lua脚本失败", err)
 		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 		return
 	}
@@ -129,7 +129,7 @@ func SelectCourse(ctx *gin.Context) {
 		logger.Logger.WithContext(ctx).Info("课程时间冲突")
 		resp.Fail(ctx, code.Fail, code.CourseTimeConflict, code.CourseTimeConflictMsg)
 	default:
-		logger.Logger.WithContext(ctx).Info("未知错误")
+		logger.Logger.WithContext(ctx).Warning("未知错误")
 		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 	}
 }
@@ -153,6 +153,7 @@ func BackCourse(ctx *gin.Context) {
 		strconv.Itoa(offset),
 	}, req.UserID, req.CourseID)
 	if err != nil {
+		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 		return
 	}
 
@@ -169,7 +170,7 @@ func BackCourse(ctx *gin.Context) {
 		logger.Logger.WithContext(ctx).Info("退课失败：课程未选择")
 		resp.Fail(ctx, code.Fail, code.CourseNotSelected, code.CourseNotSelectedMsg)
 	default:
-		logger.Logger.WithContext(ctx).Info("未知错误")
+		logger.Logger.WithContext(ctx).Warning("未知错误")
 		resp.Fail(ctx, code.Fail, code.Fail, code.FailMsg)
 	}
 }

@@ -176,7 +176,7 @@ func updateUserFlag(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) error {
 		logger.Logger.Debug("获取用户信息", err)
 		return fmt.Errorf("用户ID: %d 不存在", msg.UserID)
 	}
-	offset -= 1
+
 	if selectAction {
 		user.Flag.SetBit(offset)
 	} else {
@@ -201,6 +201,7 @@ func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) e
 			UserID:    msg.UserID,
 			CourseID:  msg.CourseID,
 			CreatedAt: msg.CreatedAt, // 创建时记录创建时间
+			UpdatedAt: msg.CreatedAt,
 			IsDeleted: !selectAction,
 		}).Error; err != nil {
 			logger.Logger.Info("创建选课记录失败", err)
@@ -208,11 +209,15 @@ func updateUserCourseState(tx *gorm.DB, msg *mqm.CourseReq, selectAction bool) e
 		}
 		return nil
 	}
+	// 存在，判断是否在创建时间之后，在的话，不更新。（失效）
+	if msg.CreatedAt < userCourse.UpdatedAt {
+		return nil
+	}
 	// 存在，还是判断msg是否在创建时间之前，不在的话，不更新。
 	if err := tx.Model(&models.UserCourse{}).
-		Where("user_id=? and course_id=? and created_at < ?", msg.UserID, msg.CourseID, msg.CreatedAt).
+		Where("user_id=? and course_id=?", msg.UserID, msg.CourseID).
 		Update("is_deleted", !selectAction).
-		Update("created_at", msg.CreatedAt).Error; err != nil {
+		Update("updated_at", msg.CreatedAt).Error; err != nil {
 		logger.Logger.Info("更新选课记录失败", err)
 		return err
 	}

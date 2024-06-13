@@ -56,5 +56,6 @@ type UserCourse struct {
 	CourseID  uint    `json:"courseID" gorm:"not null;uniqueIndex:user_course;comment:课程ID"`
 	Course    *Course `json:"course" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;comment:课程"`
 	CreatedAt int64   `json:"created_at" comment:"创建时间"`
+	UpdatedAt int64   `json:"updated_at" comment:"更新时间"`
 	IsDeleted bool    `json:"is_deleted" gorm:"type:bool;not null;default:false;comment:是否删除"`
 }
