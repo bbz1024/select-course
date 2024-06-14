@@ -29,9 +29,7 @@ var SelectConsumer *Select
 
 // UnconfirmedMessage 定义未确认消息结构体
 type UnconfirmedMessage struct {
-	Exchange   string
-	RoutingKey string
-	Body       []byte
+	Body []byte
 }
 
 type Select struct {
@@ -111,11 +109,37 @@ func (s *Select) Declare() error {
 }
 func (s *Select) ListenConfirm() {
 	for msg := range s.confirmMsg {
-		fmt.Println(msg.DeliveryTag)
 		if TestMsgLose {
 			cache.RDB.HIncrBy(context.Background(), "record", "total", 1)
 		}
-
+		if !msg.Ack {
+			if TestMsgLose {
+				cache.RDB.HIncrBy(context.Background(), "record", "ack-fail", 1)
+			}
+			val, ok := s.unconfirmedMessages.Load(msg.DeliveryTag)
+			if !ok {
+				logger.Logger.Error("消息确认失败", msg)
+				continue
+			}
+			data := val.(UnconfirmedMessage)
+			// 重新发送，尝试3次
+			var cnt int
+			if err := retry.Do(func() error {
+				if err := s.PushDeadQueue(data.Body); err != nil {
+					cnt++
+					logger.Logger.Error("消息发送失败%d次", cnt)
+					return err
+				}
+				return nil
+			}, retry.Attempts(3), retry.Delay(time.Millisecond*100)); err != nil {
+				logger.Logger.Error("消息重新发送失败", err)
+				// 丢入到死信队列，进行补偿操作
+				if err := s.PushDeadQueue(data.Body); err != nil {
+					logger.Logger.Error("消息发送失败", err)
+				}
+			}
+		}
+		s.unconfirmedMessages.Delete(msg.DeliveryTag)
 	}
 }
 
@@ -192,7 +216,6 @@ func (s *Select) Consumer() error {
 				cache.RDB.HIncrBy(context.Background(), "record", "consume-fail", 1)
 
 			}
-
 			continue
 		}
 		//time.Sleep(time.Millisecond * 500)
@@ -331,21 +354,21 @@ func (s *Select) Product(msg *mqm.CourseReq) {
 		cache.RDB.HIncrBy(context.Background(), "record", "produce-total", 1)
 
 	}
+	s.cnt.Add(1)
 	var cnt uint8
 	if err := retry.Do(func() error {
-		if err = s.channel.Publish(
-			variable.SelectExchange,
-			variable.SelectRoutingKey,
-			true,
-			false, amqp.Publishing{
-				DeliveryMode: amqp.Persistent,
-				ContentType:  "application/json",
-				Body:         bytes,
-			}); err != nil {
+		if err = s.PushMainQueue(bytes); err != nil {
 			cnt++
 			logger.Logger.Warningf("消息发送失败,尝试次数: %d", cnt)
 			return err
 		}
+		if TestMsgLose {
+			cache.RDB.HIncrBy(context.Background(), "record", "produce-success", 1)
+		}
+		// 记录消息
+		s.unconfirmedMessages.Store(s.cnt.Load(), UnconfirmedMessage{
+			Body: bytes,
+		})
 		return nil
 	}, retry.Attempts(3), retry.Delay(time.Millisecond*100)); err != nil {
 		logger.Logger.Error("尝试消息发送失败", err)
@@ -353,16 +376,30 @@ func (s *Select) Product(msg *mqm.CourseReq) {
 			cache.RDB.HIncrBy(context.Background(), "record", "produce-fail", 1)
 		}
 		// 死信
-		if err := s.channel.Publish(
-			variable.DeadExchange,
-			variable.DeadRoutingKey,
-			true,
-			false, amqp.Publishing{
-				DeliveryMode: amqp.Persistent,
-				ContentType:  "application/json",
-				Body:         bytes,
-			}); err != nil {
+		if err := s.PushDeadQueue(bytes); err != nil {
 			logger.Logger.Error("死信消息发送失败", err)
 		}
 	}
+}
+func (s *Select) PushDeadQueue(body []byte) error {
+	return s.channel.Publish(
+		variable.DeadExchange,
+		variable.DeadRoutingKey,
+		true,
+		false, amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		})
+}
+func (s *Select) PushMainQueue(body []byte) error {
+	return s.channel.Publish(
+		variable.SelectExchange,
+		variable.SelectRoutingKey,
+		true,
+		false, amqp.Publishing{
+			DeliveryMode: amqp.Persistent,
+			ContentType:  "application/json",
+			Body:         body,
+		})
 }
