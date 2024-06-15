@@ -27,7 +27,7 @@ func InitApiRouter() *gin.Engine {
 			"message": "pong",
 		})
 	})
-	user := v1.Group("user")
+	user := v1.Group("users")
 
 	{
 

@@ -1,0 +1,15 @@
+syntax = "proto3";
+option go_package = "./src/rpc/users;users";
+message UserRequest {
+  int64 user_id = 1;
+}
+message UserResponse {
+  int64 user_id = 1;
+  string user_name = 2;
+  string password = 3;
+}
+service UserService {
+  rpc GetUserInfo(UserRequest) returns (UserResponse);
+}
+
+// protoc -I .\src\idl\ .\src\idl\*.proto --go_out=./ --go-grpc_out=./

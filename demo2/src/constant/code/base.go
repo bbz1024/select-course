@@ -6,7 +6,7 @@ const (
 	NotFound     = 404
 	Fail         = 500
 
-	// user
+	// users
 
 	UserNotFound = 1000
 
@@ -30,7 +30,7 @@ const (
 	NotFoundMsg        = "not found"
 	FailMsg            = "fail"
 
-	// user
+	// users
 
 	UserNotFoundMsg = "用户不存在"
 

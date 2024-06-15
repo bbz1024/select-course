@@ -22,7 +22,7 @@ func InitApiRouter() *gin.Engine {
 	}
 	v1 := router.Group("api/v1")
 	v1.Use(middleware.Auth)
-	user := v1.Group("user")
+	user := v1.Group("users")
 
 	{
 

@@ -1,0 +1,65 @@
+syntax = "proto3";
+option go_package = "./src/rpc/course;course";
+
+// 课程信息消息类型
+message Course{
+  int64 id = 1;
+  string name = 2;
+  int64 capacity = 3;
+}
+
+// 课程列表响应消息类型
+message CourseListRespond{
+  repeated Course courses = 1;
+}
+
+// 选课请求消息类型
+message CourseOptRequest{
+  int64 user_id = 1;
+  int64 course_id = 2;
+}
+message CourseOptResponse{
+}
+
+// 获取所有课程的服务请求与响应定义
+message GetAllCoursesRequest{}
+
+message GetAllCoursesResponse{
+  repeated Course courses = 1;
+}
+
+// 获取我的课程的服务请求与响应定义
+message GetMyCoursesRequest{
+  int64 user_id = 1;
+}
+
+message GetMyCoursesResponse{
+  repeated Course courses = 1;
+}
+
+// 扣减课程容量及创建消息的请求与响应可以后续根据实际业务逻辑设计
+
+message EnQueueCourseRequest{
+  int64 course_id = 1;
+  int64 user_id = 2;
+  // 消息创建时间
+  int64 create_at = 3;
+  // 选课状态
+  bool is_select = 4;
+}
+
+service CourseService{
+  // 获取所有课程列表
+  rpc GetAllCourses(GetAllCoursesRequest) returns (GetAllCoursesResponse) {}
+
+  // 获取指定用户的课程列表（我的课程）
+  rpc GetMyCourses(GetMyCoursesRequest) returns (GetMyCoursesResponse) {}
+
+  // 选课操作
+  rpc SelectCourse(CourseOptRequest) returns (CourseOptResponse) {}
+  // 退课操作
+  rpc BackCourse(CourseOptRequest) returns (CourseOptResponse) {}
+  // 其中选课操作和退课操作都存在在redis预创建，如何丢入到消息队列进行处理操作，消息队列处理操作为：扣减课程，修改用户课程表，添加用户选课记录操作。
+  // 丢入消息队列操作
+  rpc EnQueueCourse(EnQueueCourseRequest) returns (CourseOptResponse) {}
+}
