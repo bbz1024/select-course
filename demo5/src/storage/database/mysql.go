@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"github.com/avast/retry-go"
+	"go.uber.org/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -18,8 +19,7 @@ import (
 
 var Client *gorm.DB
 
-func init() {
-
+func InitMysql()error {
 	dns := fmt.Sprintf(
 		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		config.EnvCfg.MysqlUser,
@@ -29,6 +29,7 @@ func init() {
 		config.EnvCfg.MysqlDatabase,
 	)
 	// 针对mysql未启动时，
+	var cnt int
 	if err := retry.Do(func() error {
 		db, err := gorm.Open(mysql.New(mysql.Config{
 			DSN:                       dns,
@@ -46,6 +47,8 @@ func init() {
 			SkipDefaultTransaction: true,
 		})
 		if err != nil {
+			cnt++
+			logger2.Logger.Warn(fmt.Sprintf("try count %d", cnt), zap.String("addr", dns))
 			return err
 		}
 		Client = db
@@ -60,13 +63,14 @@ func init() {
 		models.Schedule{},
 		models.CourseCategory{},
 	); err != nil {
-		panic(err)
+		return err
 	}
 	sqlDB, _ := Client.DB()
 	sqlDB.SetMaxIdleConns(config.EnvCfg.MysqlMaxIdleConns) // 设置连接池，空闲
 	sqlDB.SetMaxOpenConns(config.EnvCfg.MysqlMaxOpenConns) // 打开
 	sqlDB.SetConnMaxLifetime(time.Second * 300)
 	logger2.Logger.Info("mysql connect success")
+	return nil
 }
 func getGormLogger() logger.Interface {
 	var logMode logger.LogLevel

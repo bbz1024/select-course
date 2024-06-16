@@ -6,11 +6,14 @@ message Course{
   int64 id = 1;
   string name = 2;
   int64 capacity = 3;
+
 }
 
 // 课程列表响应消息类型
 message CourseListRespond{
-  repeated Course courses = 1;
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
+  repeated Course courses = 3;
 }
 
 // 选课请求消息类型
@@ -19,13 +22,17 @@ message CourseOptRequest{
   int64 course_id = 2;
 }
 message CourseOptResponse{
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
 }
 
 // 获取所有课程的服务请求与响应定义
 message GetAllCoursesRequest{}
 
 message GetAllCoursesResponse{
-  repeated Course courses = 1;
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
+  repeated Course courses = 3;
 }
 
 // 获取我的课程的服务请求与响应定义
@@ -34,7 +41,9 @@ message GetMyCoursesRequest{
 }
 
 message GetMyCoursesResponse{
-  repeated Course courses = 1;
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
+  repeated Course courses = 3;
 }
 
 // 扣减课程容量及创建消息的请求与响应可以后续根据实际业务逻辑设计

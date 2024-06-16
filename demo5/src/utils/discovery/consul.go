@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	capi "github.com/hashicorp/consul/api"
+	"go.uber.org/zap"
 	"log"
 	config2 "select-course/demo5/src/constant/config"
+	"select-course/demo5/src/utils/logger"
 	"strconv"
 )
 
@@ -50,7 +52,9 @@ func (c *ConsulDiscovery) Register(ctx context.Context, service Service) error {
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
 	}
-	log.Printf("register service %s success", service.Name)
+	logger.LogService(service.Name).Debug("register service success",
+		zap.String("address", fmt.Sprintf("%s:%s", config2.EnvCfg.BaseHost, service.Port)),
+	)
 	return nil
 }
 

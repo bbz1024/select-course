@@ -15,18 +15,13 @@ import (
 	"time"
 )
 
-func Connect(ctx context.Context, serviceName string) (conn *grpc.ClientConn) {
-
+func Dial(addr string) (*grpc.ClientConn, error) {
 	kacp := keepalive.ClientParameters{
 		Time:                10 * time.Second, // send pings every 10 seconds if there is no activity
 		Timeout:             time.Second,      // wait 1 second for ping ack before considering the connection dead
 		PermitWithoutStream: false,            // send pings even without active streams
 	}
-	addr, err := discovery.Consul.GetService(ctx, serviceName)
-	if err != nil {
-		panic(err)
-	}
-	conn, err = grpc.Dial(
+	return grpc.Dial(
 		addr,
 		grpc.WithInsecure(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -42,8 +37,18 @@ func Connect(ctx context.Context, serviceName string) (conn *grpc.ClientConn) {
 			grpc_opentracing.UnaryClientInterceptor(),
 		),
 	)
+}
+
+func Connect(ctx context.Context, serviceName string) *grpc.ClientConn {
+	addr, err := discovery.Consul.GetService(ctx, serviceName)
 	if err != nil {
-		logger.LogServer(serviceName).Error("connect error ", zap.Error(err), zap.String("service", serviceName))
+		logger.LogService(serviceName).Error("get service error", zap.Error(err))
+		panic(err)
 	}
-	return
+	conn, err := Dial(addr)
+	if err != nil {
+		logger.LogService(serviceName).Error("dial error", zap.Error(err))
+		panic(err)
+	}
+	return conn
 }

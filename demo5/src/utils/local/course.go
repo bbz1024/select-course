@@ -13,11 +13,11 @@ type CourseScheduleModel struct {
 	Duration int
 }
 
-func init() {
+func InitLocal() error {
 	CourseSchedule = make(map[uint]*CourseScheduleModel)
 	var courseList []*models.Course
 	if err := database.Client.Model(&models.Course{}).Preload("Schedule").Find(&courseList).Error; err != nil {
-		panic(err)
+		return err
 	}
 	for _, course := range courseList {
 		CourseSchedule[course.ID] = &CourseScheduleModel{
@@ -25,6 +25,7 @@ func init() {
 			Duration: int(course.Schedule.Duration),
 		}
 	}
+	return nil
 }
 func CalOffset(courseID uint) (offset int, err error) {
 	model, ok := CourseSchedule[courseID]

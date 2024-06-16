@@ -20,7 +20,11 @@ import (
 	"testing"
 )
 
+func init() {
+	database.InitMysql()
+}
 func TestInsertSchedule(t *testing.T) {
+
 	var schedule []models.Schedule
 	week := 5
 	duration := 3

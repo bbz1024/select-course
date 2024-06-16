@@ -2,37 +2,54 @@ package resp
 
 import (
 	"github.com/gin-gonic/gin"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"net/http"
 	"select-course/demo5/src/constant/code"
 )
 
 type Response struct {
-	Code  int         `json:"code"`
-	Data  interface{} `json:"data"`
-	Msg   string      `json:"msg"`
-	Error string      `json:"error"`
+	StatusCode int    `json:"status_code"`
+	StatusMsg  string `json:"status_msg"`
 }
 
-func Success(ctx *gin.Context, data interface{}) {
-	ctx.JSON(code.Success, &Response{
-		Code: code.Success,
-		Data: data,
-		Msg:  code.SuccessMsg,
-	})
-
-}
-
-func Fail(ctx *gin.Context, status int, cd int, err string) {
+func Fail(ctx *gin.Context, statusCode int, StatusMsg string) {
 	ctx.JSON(
-		status, &Response{
-			Code:  cd,
-			Error: err,
-			Data:  nil,
+		http.StatusOK, &Response{
+			statusCode, StatusMsg,
 		},
 	)
 }
 func ParamErr(ctx *gin.Context) {
-	Fail(ctx, code.ParamErr, code.ParamErr, code.ParamErrMsg)
+	ctx.JSON(
+		http.StatusOK, &Response{
+			code.ParamErr, code.ParamErrMsg,
+		},
+	)
 }
 func DBError(ctx *gin.Context) {
-	Fail(ctx, code.Fail, code.DBError, code.DBErrorMsg)
+	ctx.JSON(http.StatusInternalServerError, &Response{
+		code.DBError, code.DBErrorMsg,
+	})
+}
+
+type CustomJSON struct {
+	Data    proto.Message
+	Context *gin.Context
+}
+
+var m = protojson.MarshalOptions{
+	EmitUnpopulated: true,
+	UseProtoNames:   true,
+}
+
+func (r CustomJSON) Render(w http.ResponseWriter) (err error) {
+	r.WriteContentType(w)
+	res, _ := m.Marshal(r.Data)
+	_, err = w.Write(res)
+	return
+}
+
+func (r CustomJSON) WriteContentType(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 }

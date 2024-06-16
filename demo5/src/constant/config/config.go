@@ -17,15 +17,7 @@ type envConfig struct {
 	ProjectMode string `env:"PROJECT_MODE" envDefault:"dev"`
 	// logger
 	LoggerLevel string `env:"PROJECT_LOG_LEVEL" envDefault:"DEBUG"`
-	/*
-	   level: info # 日志等级
-	   root_dir: ./logs # 日志根目录
-	   filename: app.log # 日志文件名称
-	   max_backups: 3 # 旧文件的最大个数
-	   max_size: 500 # 日志文件最大大小（MB）
-	   max_age: 28 # 旧文件的最大保留天数
-	   compress: true # 是否压缩
-	*/
+
 	LoggerDir        string `env:"PROJECT_LOG_DIR" envDefault:"./logs"`
 	LoggerName       string `env:"PROJECT_LOG_NAME" envDefault:"app.log"`
 	LoggerMaxBackups int    `env:"PROJECT_LOG_MAX_BACKUPS" envDefault:"3"`

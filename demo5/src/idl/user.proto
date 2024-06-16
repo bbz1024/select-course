@@ -1,12 +1,14 @@
 syntax = "proto3";
-option go_package = "./src/rpc/users;users";
+option go_package = "./src/rpc/user;user";
 message UserRequest {
   int64 user_id = 1;
 }
 message UserResponse {
-  int64 user_id = 1;
-  string user_name = 2;
-  string password = 3;
+  int32 status_code = 1; // 状态码，0-成功，其他值-失败
+  string status_msg = 2; // 返回状态描述
+  int64 user_id = 3;
+  string user_name = 4;
+  string password = 5;
 }
 service UserService {
   rpc GetUserInfo(UserRequest) returns (UserResponse);

@@ -2,29 +2,60 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+	"select-course/demo5/src/constant/code"
 	"select-course/demo5/src/constant/services"
-	"select-course/demo5/src/rpc/course"
+	"select-course/demo5/src/models"
 	"select-course/demo5/src/rpc/user"
-	grpc2 "select-course/demo5/src/utils/grpc"
+	"select-course/demo5/src/storage/database"
+	"select-course/demo5/src/utils/logger"
+	"select-course/demo5/src/utils/tracing"
 )
 
 type User struct {
 	user.UnimplementedUserServiceServer
 }
 
-var courseClient course.CourseServiceClient
+var (
+	Logger *zap.Logger
+)
 
 func (u *User) New() {
-	conn := grpc2.Connect(context.Background(), services.CourseRpcServerName)
-	courseClient = course.NewCourseServiceClient(conn)
+	// init rpc client
+	Logger = logger.LogService(services.UserRpcServerName)
 
 }
-func (u *User) GetUserInfo(ctx context.Context, res *user.UserRequest) (*user.UserResponse, error) {
-	courseRes, err := courseClient.GetAllCourses(ctx, nil)
-	if err != nil {
-		return nil, err
+func (u *User) GetUserInfo(ctx context.Context, req *user.UserRequest) (*user.UserResponse, error) {
+	// tracing
+	span := tracing.StartSpan(ctx, "GetUserInfo")
+	defer span.Finish()
+	// get userinfo
+	logField := []zap.Field{zap.Int64("user_id", req.UserId)}
+	var userInfo models.User
+	if err := database.Client.First(&userInfo, req.UserId).Error; err != nil {
+		tracing.RecordError(span, err)
+		logField = append(logField, zap.Error(err))
+		Logger.Error("GetUserInfo", logField...)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &user.UserResponse{
+				StatusCode: code.UserNotFound,
+				StatusMsg:  code.UserNotFoundMsg,
+			}, err
+		}
+		return &user.UserResponse{
+			StatusCode: code.DBError,
+			StatusMsg:  code.DBErrorMsg,
+		}, err
 	}
-	fmt.Println(courseRes)
-	return nil, nil
+	// build res
+	res := &user.UserResponse{
+		StatusCode: int32(code.Success),
+		StatusMsg:  code.SuccessMsg,
+		UserId:     int64(userInfo.ID),
+		UserName:   userInfo.UserName,
+		Password:   userInfo.Password,
+	}
+	return res, nil
 }
