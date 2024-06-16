@@ -19,7 +19,7 @@ import (
 
 var Client *gorm.DB
 
-func InitMysql()error {
+func InitMysql() error {
 	dns := fmt.Sprintf(
 		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		config.EnvCfg.MysqlUser,
@@ -86,7 +86,7 @@ func getGormLogger() logger.Interface {
 	default:
 		logMode = logger.Info
 	}
-	fmt.Println(logMode)
+
 	return logger.New(getGormLogWriter(), logger.Config{
 		//SlowThreshold:             500 * time.Millisecond, // 慢 SQL 阈值
 		LogLevel:                  logMode, // 日志级别

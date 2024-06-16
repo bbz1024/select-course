@@ -8483,3 +8483,21 @@
 {"level":"error","ts":"2024-06-16 16:46:38","caller":"mock/gen_course_test.go:160","msg":"事务处理失败"}
 {"level":"info","ts":"2024-06-16 16:46:38","caller":"mock/gen_course_test.go:154","msg":"更新课程时间失败"}
 {"level":"error","ts":"2024-06-16 16:46:38","caller":"mock/gen_course_test.go:160","msg":"事务处理失败"}
+{"level":"info","ts":"2024-06-16 16:59:51","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 16:59:51","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 16:59:51","caller":"database/mysql.go:72","msg":"mysql connect success"}
+{"level":"info","ts":"2024-06-16 17:00:02","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 17:00:02","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 17:00:02","caller":"database/mysql.go:72","msg":"mysql connect success"}
+{"level":"info","ts":"2024-06-16 17:00:05","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 17:00:05","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 17:00:05","caller":"database/mysql.go:72","msg":"mysql connect success"}
+{"level":"info","ts":"2024-06-16 17:21:49","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 17:21:49","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 17:21:49","caller":"database/mysql.go:72","msg":"mysql connect success"}
+{"level":"info","ts":"2024-06-16 17:21:52","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 17:21:52","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 17:21:52","caller":"database/mysql.go:72","msg":"mysql connect success"}
+{"level":"info","ts":"2024-06-16 17:21:54","caller":"cache/redis.go:35","msg":"redis connect success"}
+{"level":"info","ts":"2024-06-16 17:21:54","caller":"mq/rabbitmq.go:35","msg":"rabbitmq init success"}
+{"level":"info","ts":"2024-06-16 17:21:54","caller":"database/mysql.go:72","msg":"mysql connect success"}

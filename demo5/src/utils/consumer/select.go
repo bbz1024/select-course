@@ -218,8 +218,7 @@ func (s *Select) Consumer() error {
 			}
 			continue
 		}
-		//time.Sleep(time.Millisecond * 500)
-		//fmt.Println(msg)
+
 		if err = database.Client.Transaction(func(tx *gorm.DB) error {
 			if err := updateCourseCapacity(tx, msg, msg.Type == mqm.SelectType); err != nil {
 				return err

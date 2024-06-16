@@ -51,9 +51,11 @@ func (c *ConsulDiscovery) Register(ctx context.Context, service Service) error {
 		reg.Check = &capi.AgentServiceCheck{
 			Interval:                       "5s",
 			Timeout:                        "5s",
-			DeregisterCriticalServiceAfter: "10s",
-			HTTP:                           fmt.Sprintf("http://%s:%d/health", config2.EnvCfg.BaseHost, parsePort),
+			GRPC:                           fmt.Sprintf("%s:%d", config2.EnvCfg.BaseHost, parsePort),
+			GRPCUseTLS:                     false,
+			DeregisterCriticalServiceAfter: "30s", // 30s
 		}
+
 	}
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
@@ -76,6 +78,7 @@ func (c *ConsulDiscovery) Deregister(ctx context.Context, name string) error {
 }
 
 func (c *ConsulDiscovery) GetService(ctx context.Context, name string) (string, error) {
+
 	return fmt.Sprintf("consul://%s/%s?wait=15s", c.Address, name), nil
 }
 
