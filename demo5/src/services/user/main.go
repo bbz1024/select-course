@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
+	"os"
 	"select-course/demo5/src/constant/services"
 	"select-course/demo5/src/rpc/user"
 	"select-course/demo5/src/storage/database"
@@ -15,6 +16,7 @@ import (
 	"select-course/demo5/src/utils/local"
 	"select-course/demo5/src/utils/logger"
 	"select-course/demo5/src/utils/tracing"
+	"syscall"
 )
 
 func main() {
@@ -64,11 +66,14 @@ func main() {
 		)
 		rpcServer.GracefulStop()
 	})
+	g.Add(run.SignalHandler(context.Background(), syscall.SIGINT, syscall.SIGTERM))
 	if err := g.Run(); err != nil {
 		logger.Logger.Error("Rpc %s listen happens error for: %v",
 			zap.String("UserService", services.UserRpcServerAddr), zap.Error(err),
 		)
-
-		panic(err)
+		if err := discovery.Consul.Deregister(context.Background(), services.UserRpcServerAddr); err != nil {
+			logger.LogService(services.UserRpcServerAddr).Error("deregister error", zap.Error(err))
+		}
+		os.Exit(1)
 	}
 }

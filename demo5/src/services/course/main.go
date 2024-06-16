@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"net"
+	"os"
 	"select-course/demo5/src/constant/services"
 	"select-course/demo5/src/rpc/course"
 	"select-course/demo5/src/storage/database"
@@ -16,6 +17,7 @@ import (
 	"select-course/demo5/src/utils/local"
 	"select-course/demo5/src/utils/logger"
 	"select-course/demo5/src/utils/tracing"
+	"syscall"
 )
 
 func main() {
@@ -48,7 +50,7 @@ func main() {
 		panic(err)
 	}
 	//init local
-	if err := local.InitLocal();err!=nil{
+	if err := local.InitLocal(); err != nil {
 		logger.Logger.Error("local init error", zap.Error(err))
 		panic(err)
 	}
@@ -83,8 +85,12 @@ func main() {
 		logger.LogService(services.CourseRpcServerName).Error("consumer stopped", zap.Error(err))
 		consumer.SelectConsumer.Close()
 	})
+	g.Add(run.SignalHandler(context.Background(), syscall.SIGINT, syscall.SIGTERM))
 	if err := g.Run(); err != nil {
 		logger.LogService(services.CourseRpcServerName).Error("run error", zap.Error(err))
-		panic(err)
+		if err := discovery.Consul.Deregister(context.Background(), services.CourseRpcServerName); err != nil {
+			logger.LogService(services.CourseRpcServerName).Error("deregister error", zap.Error(err))
+		}
+		os.Exit(1)
 	}
 }

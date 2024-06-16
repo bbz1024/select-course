@@ -39,7 +39,7 @@ func main() {
 		return
 	}
 	//init local
-	if err := local.InitLocal();err!=nil{
+	if err := local.InitLocal(); err != nil {
 		logger.Logger.Error("local init error", zap.Error(err))
 		panic(err)
 	}

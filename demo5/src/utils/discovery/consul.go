@@ -12,9 +12,10 @@ import (
 )
 
 type ConsulDiscovery struct {
-	prefix  string
-	Address string
-	client  *capi.Client
+	prefix    string
+	Address   string
+	client    *capi.Client
+	serviceID string
 }
 
 func NewConsulDiscovery(address string, prefix string) *ConsulDiscovery {
@@ -36,18 +37,23 @@ func (c *ConsulDiscovery) Register(ctx context.Context, service Service) error {
 	if err != nil {
 		return err
 	}
+	serviceID := fmt.Sprintf("%s-%s-%s:%d", c.prefix, service.Name, config2.EnvCfg.BaseHost, parsePort)
+	c.serviceID = serviceID
 	reg := &capi.AgentServiceRegistration{
-		ID:      fmt.Sprintf("%s-%s-%d", c.prefix, service.Name, parsePort),
+		ID:      serviceID,
 		Name:    service.Name,
 		Address: config2.EnvCfg.BaseHost,
 		Port:    parsePort,
-		//Http检查
-		//Check: &capi.AgentServiceCheck{
-		//	Interval:                       "5s",
-		//	Timeout:                        "5s",
-		//	DeregisterCriticalServiceAfter: "10s",
-		//	HTTP:                           fmt.Sprintf("http://%s:%d/health", service.Address, port),
-		//},
+		// Http检查
+
+	}
+	if config2.EnvCfg.ProjectMode == "prod" {
+		reg.Check = &capi.AgentServiceCheck{
+			Interval:                       "5s",
+			Timeout:                        "5s",
+			DeregisterCriticalServiceAfter: "10s",
+			HTTP:                           fmt.Sprintf("http://%s:%d/health", config2.EnvCfg.BaseHost, parsePort),
+		}
 	}
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
@@ -59,7 +65,14 @@ func (c *ConsulDiscovery) Register(ctx context.Context, service Service) error {
 }
 
 func (c *ConsulDiscovery) Deregister(ctx context.Context, name string) error {
-	panic("implement me")
+	if c.serviceID == "" {
+		return nil
+	}
+	if err := c.client.Agent().ServiceDeregister(c.serviceID); err != nil {
+		return err
+	}
+	logger.LogService(name).Debug("deregister service success", zap.String("id", c.serviceID))
+	return nil
 }
 
 func (c *ConsulDiscovery) GetService(ctx context.Context, name string) (string, error) {
