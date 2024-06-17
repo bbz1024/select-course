@@ -84,62 +84,87 @@ services:
       retries: 3
     networks:
       - Course
-  user:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "10000:10000"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
-    depends_on:
-      - jaeger
-      - consul
-      - redis
-      - mysql
-      - rabbitmq
-    env_file:
-      - .env
-    networks:
-      - Course
+  prometheus:
+    image: bitnami/prometheus:latest
     volumes:
-      - ./logs:/project/logs
-  course:
-    image: select-course
-    restart: unless-stopped
+      - ./prometheus.yml:/opt/bitnami/prometheus/conf/prometheus.yml
     ports:
-      - "10001:10001"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
-    depends_on:
-      - jaeger
-      - consul
-      - redis
-      - mysql
-      - rabbitmq
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-  app:
-    image: select-course
-    restart: unless-stopped
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      #热加载配置
+      - '--web.enable-lifecycle'
+      #api配置
+      #- '--web.enable-admin-api'
+      #历史数据最大保留时间，默认15天
+      - '--storage.tsdb.retention.time=30d'
+  grafana:
+    image: grafana/grafana
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
-      - "8888:8888"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-    depends_on:
-      - user
-      - course
-      - jaeger
-      - consul
-      - redis
-      - mysql
-      - rabbitmq
+      - "3000:3000"
+#  user:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "10000:10000"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
+#    depends_on:
+#      - jaeger
+#      - consul
+#      - redis
+#      - mysql
+#      - rabbitmq
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#  course:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "10001:10001"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
+#    depends_on:
+#      - jaeger
+#      - consul
+#      - redis
+#      - mysql
+#      - rabbitmq
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#  app:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "8888:8888"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#    depends_on:
+#      - user
+#      - course
+#      - jaeger
+#      - consul
+#      - redis
+#      - mysql
+#      - rabbitmq
 
 networks:
   Course:
