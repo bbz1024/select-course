@@ -18,7 +18,6 @@ func Success(ctx *gin.Context, data interface{}) {
 		Data: data,
 		Msg:  code.SuccessMsg,
 	})
-
 }
 
 func Fail(ctx *gin.Context, status int, cd int, err string) {

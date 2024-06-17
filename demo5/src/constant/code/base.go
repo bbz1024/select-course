@@ -23,6 +23,11 @@ const (
 	// mysql
 
 	DBError = 3000
+
+	// 熔断机制触发
+
+	CircuitBreakerTrigger = 4000
+	LimitTrigger          = 5000
 )
 const (
 	// base
@@ -49,4 +54,7 @@ const (
 	// db
 
 	DBErrorMsg = "查询失败"
+
+	CircuitBreakerTriggerMsg = "系统繁忙，请稍后再试"
+	LimitTriggerMsg          = "请求太频繁，请稍后再试"
 )
