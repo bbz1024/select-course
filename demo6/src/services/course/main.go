@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	sentinel "github.com/alibaba/sentinel-golang/api"
+	"github.com/alibaba/sentinel-golang/core/circuitbreaker"
+	"github.com/alibaba/sentinel-golang/core/hotspot"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	"github.com/oklog/run"
 	"github.com/opentracing/opentracing-go"
@@ -9,14 +12,16 @@ import (
 	"google.golang.org/grpc"
 	"net"
 	"os"
-	"select-course/demo5/src/constant/services"
-	"select-course/demo5/src/rpc/course"
-	"select-course/demo5/src/storage/database"
-	"select-course/demo5/src/utils/consumer"
-	"select-course/demo5/src/utils/discovery"
-	"select-course/demo5/src/utils/local"
-	"select-course/demo5/src/utils/logger"
-	"select-course/demo5/src/utils/tracing"
+	"select-course/demo6/src/constant/services"
+	"select-course/demo6/src/rpc/course"
+	"select-course/demo6/src/storage/database"
+	"select-course/demo6/src/utils/breaker"
+	"select-course/demo6/src/utils/consumer"
+	"select-course/demo6/src/utils/discovery"
+	"select-course/demo6/src/utils/limiter"
+	"select-course/demo6/src/utils/local"
+	"select-course/demo6/src/utils/logger"
+	"select-course/demo6/src/utils/tracing"
 	"syscall"
 )
 
@@ -61,6 +66,21 @@ func main() {
 		logger.Logger.Error("SelectConsumer init error for: %v", zap.Error(err))
 		panic(err)
 
+	}
+
+	// init sentinel
+	if err := sentinel.InitWithConfigFile("./sentinel.yml"); err != nil {
+		logger.Logger.Error("sentinel init error for: %v", zap.Error(err))
+		panic(err)
+	}
+	circuitbreaker.RegisterStateChangeListeners(&breaker.StateChangeTestListener{}) // 熔断器监听
+	if _, err = circuitbreaker.LoadRules(breaker.ErrorCountRules); err != nil {
+		logger.Logger.Error("breaker init error for: %v", zap.Error(err))
+		panic(err)
+	}
+	if _, err := hotspot.LoadRules(limiter.LimitRules); err != nil {
+		logger.Logger.Error("limiter init error for: %v", zap.Error(err))
+		panic(err)
 	}
 
 	// consul register

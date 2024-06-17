@@ -2,22 +2,25 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	sentinel "github.com/alibaba/sentinel-golang/api"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	"select-course/demo5/src/constant/code"
-	"select-course/demo5/src/constant/keys"
-	"select-course/demo5/src/constant/lua"
-	"select-course/demo5/src/constant/services"
-	"select-course/demo5/src/models"
-	"select-course/demo5/src/models/mqm"
-	"select-course/demo5/src/rpc/course"
-	"select-course/demo5/src/storage/cache"
-	"select-course/demo5/src/storage/database"
-	"select-course/demo5/src/utils/consumer"
-	"select-course/demo5/src/utils/local"
-	"select-course/demo5/src/utils/logger"
-	"select-course/demo5/src/utils/tracing"
+	"select-course/demo6/src/constant/code"
+	"select-course/demo6/src/constant/keys"
+	"select-course/demo6/src/constant/lua"
+	"select-course/demo6/src/constant/services"
+	"select-course/demo6/src/models"
+	"select-course/demo6/src/models/mqm"
+	"select-course/demo6/src/rpc/course"
+	"select-course/demo6/src/storage/cache"
+	"select-course/demo6/src/storage/database"
+	"select-course/demo6/src/utils/breaker"
+	"select-course/demo6/src/utils/consumer"
+	"select-course/demo6/src/utils/local"
+	"select-course/demo6/src/utils/logger"
+	"select-course/demo6/src/utils/tracing"
 	"strconv"
 )
 
@@ -65,7 +68,17 @@ func (c Course) GetMyCourses(ctx context.Context, request *course.GetMyCoursesRe
 	// tracing
 	span := tracing.StartSpan(ctx, "GetMyCourses")
 	defer span.Finish()
-
+	// limiter
+	e, b := sentinel.Entry("GetMyCourses", sentinel.WithArgs(request.UserId))
+	if b != nil {
+		fmt.Println("GetMyCourses: LimitTrigger")
+		// 对该用户进行限流
+		return &course.GetMyCoursesResponse{
+			StatusMsg:  code.LimitTriggerMsg,
+			StatusCode: code.LimitTrigger,
+		}, nil
+	}
+	defer e.Exit()
 	// find user courses
 	var userCourseList []*models.UserCourse
 	if err := database.Client.
@@ -120,6 +133,13 @@ func (c Course) SelectCourse(ctx context.Context, request *course.CourseOptReque
 	if err != nil {
 		tracing.RecordError(span, err)
 		logFiled = append(logFiled, zap.Error(err))
+		if errors.Is(breaker.BreakError, err) {
+			Logger.Warn("circuit breaker", logFiled...)
+			return &course.CourseOptResponse{
+				StatusCode: code.CircuitBreakerTrigger,
+				StatusMsg:  code.CircuitBreakerTriggerMsg,
+			}, nil
+		}
 		Logger.Error("SelectCourse execute lua script error", logFiled...)
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
@@ -214,8 +234,24 @@ func (c Course) EnQueueCourse(ctx context.Context, request *course.EnQueueCourse
 	panic("implement me")
 }
 func executeLuaScript(ctx context.Context, rdb *redis.Client, script *redis.Script, keys []string, args ...interface{}) (int64, error) {
+	// sentinel
+	entry, errBroke := sentinel.Entry("executeLuaScript")
+	// 如果errBroke非nil，则触发熔断，进行快速失败（降级，静态返回）
+	if errBroke != nil {
+		Logger.Warn("open circuit breaker", zap.Error(errBroke))
+		return 0, breaker.BreakError
+	}
+	defer entry.Exit()
+
+	if TestRandoBroke {
+		sentinel.TraceError(entry, errors.New("biz error"))
+		Logger.Warn("circuit breaker")
+		return 0, errors.New("模拟错误")
+	}
+
 	val, err := script.Run(ctx, rdb, keys, args...).Result()
 	if err != nil {
+		sentinel.TraceError(entry, errors.New("biz error"))
 		Logger.Warn("执行lua脚本失败", zap.Error(err))
 		return 0, err
 	}
