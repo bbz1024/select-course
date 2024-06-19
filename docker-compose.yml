@@ -12,6 +12,11 @@ services:
     env_file:
       - .env
     command: [ "redis-server", "/etc/redis/redis.conf" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   mysql:
     image: mysql:8.0-debian
     restart: unless-stopped
@@ -23,6 +28,11 @@ services:
       - .env
     networks:
       - Course
+    healthcheck:
+      test: mysql ${MYSQL_DATABASE} --user=${MYSQL_USER} --password='${MYSQL_PASSWORD}' --silent --execute "SELECT 1;"
+      interval: 10s
+      timeout: 5s
+      retries: 3
   rabbitmq:
     image: rabbitmq:3.8-management-alpine
     ports:
@@ -35,6 +45,11 @@ services:
     restart: unless-stopped
     volumes:
       - Course-Rabbitmq:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD-SHELL", "rabbitmqctl status" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   nginx:
     image: nginx
     restart: unless-stopped
@@ -109,62 +124,87 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
       - "3000:3000"
-#  user:
-#    image: select-course
-#    restart: unless-stopped
-#    ports:
-#      - "10000:10000"
-#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
-#    depends_on:
-#      - jaeger
-#      - consul
-#      - redis
-#      - mysql
-#      - rabbitmq
-#    env_file:
-#      - .env
-#    networks:
-#      - Course
-#    volumes:
-#      - ./logs:/project/logs
-#  course:
-#    image: select-course
-#    restart: unless-stopped
-#    ports:
-#      - "10001:10001"
-#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
-#    depends_on:
-#      - jaeger
-#      - consul
-#      - redis
-#      - mysql
-#      - rabbitmq
-#    env_file:
-#      - .env
-#    networks:
-#      - Course
-#    volumes:
-#      - ./logs:/project/logs
-#  app:
-#    image: select-course
-#    restart: unless-stopped
-#    ports:
-#      - "8888:8888"
-#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
-#    env_file:
-#      - .env
-#    networks:
-#      - Course
-#    volumes:
-#      - ./logs:/project/logs
-#    depends_on:
-#      - user
-#      - course
-#      - jaeger
-#      - consul
-#      - redis
-#      - mysql
-#      - rabbitmq
+  # 分布式事务状态机
+  dtm:
+    image: yedf/dtm:latest
+    restart: unless-stopped
+    ports:
+      - "36789:36789"
+      - "36790:36790"
+    volumes:
+      - ./dtm.conf.yml:/app/dtm/dtm.conf.yml
+    command: [ "-c", "dtm.conf.yml" ]
+  user:
+    image: select-course
+    restart: unless-stopped
+    ports:
+      - "10000:10000"
+    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
+    depends_on:
+      jaeger:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - Course
+    volumes:
+      - ./logs:/project/logs
+  course:
+    image: select-course
+    restart: unless-stopped
+    ports:
+      - "10001:10001"
+    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
+    depends_on:
+      jaeger:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - Course
+    volumes:
+      - ./logs:/project/logs
+  app:
+    image: select-course
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
+    env_file:
+      - .env
+    networks:
+      - Course
+    volumes:
+      - ./logs:/project/logs
+    depends_on:
+      jaeger:
+        condition: service_healthy
+      consul:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      course:
+        condition: service_started
+      user:
+        condition: service_started
 
 networks:
   Course:
