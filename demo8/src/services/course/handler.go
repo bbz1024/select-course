@@ -5,11 +5,8 @@ import (
 	"errors"
 	"fmt"
 	sentinel "github.com/alibaba/sentinel-golang/api"
-	"github.com/dtm-labs/client/dtmcli"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"select-course/demo8/src/constant/code"
 	"select-course/demo8/src/constant/keys"
 	"select-course/demo8/src/constant/lua"
@@ -36,8 +33,6 @@ var (
 )
 
 const TestRandoBroke = true
-
-var AbortedError = status.New(codes.Aborted, dtmcli.ResultFailure).Err()
 
 func (c Course) New() {
 	Logger = logger.LogService(services.CourseRpcServerName)
@@ -125,7 +120,7 @@ func (c Course) SelectCourse(ctx context.Context, request *course.CourseOptReque
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
 			StatusMsg:  code.FailMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 	val, err := executeLuaScript(ctx, cache.RDB, redis.NewScript(lua.CourseSelectLuaScript), []string{
 		fmt.Sprintf(keys.UserCourseSetKey, request.UserId),
@@ -144,13 +139,13 @@ func (c Course) SelectCourse(ctx context.Context, request *course.CourseOptReque
 			return &course.CourseOptResponse{
 				StatusCode: code.CircuitBreakerTrigger,
 				StatusMsg:  code.CircuitBreakerTriggerMsg,
-			}, nil
+			}, code.AbortedError
 		}
 		Logger.Error("SelectCourse execute lua script error", logFiled...)
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
 			StatusMsg:  code.FailMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 	switch {
 	case val >= lua.CourseOptOK:
@@ -163,24 +158,24 @@ func (c Course) SelectCourse(ctx context.Context, request *course.CourseOptReque
 		return &course.CourseOptResponse{
 			StatusCode: code.CourseSelected,
 			StatusMsg:  code.CourseSelectedMsg,
-		}, AbortedError
+		}, code.AbortedError
 	case val == lua.CourseFull:
 		Logger.Info("课程已满", logFiled...)
 		return &course.CourseOptResponse{
 			StatusCode: code.CourseFull,
 			StatusMsg:  code.CourseFullMsg,
-		}, AbortedError
+		}, code.AbortedError
 	case val == lua.CourseTimeConflict:
 		Logger.Info("课程时间冲突", logFiled...)
 		return &course.CourseOptResponse{
 			StatusCode: code.CourseTimeConflict,
 			StatusMsg:  code.CourseTimeConflictMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 
 	return &course.CourseOptResponse{
 		CreateAt: val,
-	}, AbortedError
+	}, code.AbortedError
 }
 
 func (c Course) BackCourse(ctx context.Context, request *course.CourseOptRequest) (*course.CourseOptResponse, error) {
@@ -196,7 +191,7 @@ func (c Course) BackCourse(ctx context.Context, request *course.CourseOptRequest
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
 			StatusMsg:  code.FailMsg,
-		}, status.New(codes.Aborted, dtmcli.ResultFailure).Err()
+		}, code.AbortedError
 	}
 
 	logFiled := []zap.Field{zap.Int64("course_id", request.CourseId), zap.Int64("user_id", request.UserId)}
@@ -217,13 +212,13 @@ func (c Course) BackCourse(ctx context.Context, request *course.CourseOptRequest
 			return &course.CourseOptResponse{
 				StatusCode: code.CircuitBreakerTrigger,
 				StatusMsg:  code.CircuitBreakerTriggerMsg,
-			}, nil
+			}, code.AbortedError
 		}
 		Logger.Error("BackCourse execute lua script error", logFiled...)
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
 			StatusMsg:  code.FailMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 	switch {
 	case val >= lua.CourseOptOK:
@@ -236,11 +231,11 @@ func (c Course) BackCourse(ctx context.Context, request *course.CourseOptRequest
 		return &course.CourseOptResponse{
 			StatusCode: code.CourseNotSelected,
 			StatusMsg:  code.CourseNotSelectedMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 	return &course.CourseOptResponse{
 		CreateAt: val,
-	}, AbortedError
+	}, code.AbortedError
 }
 
 // EnQueueCourse 异步消息入队
@@ -259,7 +254,7 @@ func (c Course) EnQueueCourse(ctx context.Context, request *course.EnQueueCourse
 		return &course.CourseOptResponse{
 			StatusCode: code.Fail,
 			StatusMsg:  code.FailMsg,
-		}, AbortedError
+		}, code.AbortedError
 	}
 	return nil, nil
 }
@@ -280,4 +275,38 @@ func executeLuaScript(ctx context.Context, rdb *redis.Client, script *redis.Scri
 		return 0, err
 	}
 	return val.(int64), nil
+}
+
+// -------------------- tcc 事务 --------------------
+
+// branch 1: 选课操作
+
+func (c Course) TryTryDeductCourse(ctx context.Context, req *course.CourseOptRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryTryDeductCourse")
+	resp, err := c.SelectCourse(ctx, req)
+	fmt.Println(resp.CreateAt, 44444444)
+	return resp, err
+}
+func (c Course) TryConfirmDeductCourse(ctx context.Context, req *course.CourseOptRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryConfirmDeductCourse")
+	return nil, nil
+}
+func (c Course) TryCancelDeductCourse(ctx context.Context, req *course.CourseOptRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryCancelDeductCourse")
+	return c.BackCourse(ctx, req)
+}
+
+// branch 2: 消息入队
+
+func (c Course) TryTryEnqueueMessage(ctx context.Context, req *course.EnQueueCourseRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryTryEnqueueMessage")
+	return c.EnQueueCourse(ctx, req)
+}
+func (c Course) TryConfirmEnqueueMessage(ctx context.Context, req *course.EnQueueCourseRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryConfirmEnqueueMessage")
+	return nil, nil
+}
+func (c Course) TryCancelEnqueueMessage(ctx context.Context, req *course.EnQueueCourseRequest) (res *course.CourseOptResponse, err error) {
+	Logger.Info("TryCancelEnqueueMessage")
+	return nil, nil
 }

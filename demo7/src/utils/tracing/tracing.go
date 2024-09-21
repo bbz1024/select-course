@@ -13,16 +13,22 @@ import (
 
 func GetConf(serverName string) config.Configuration {
 	cfg := config.Configuration{
-		Sampler: &config.SamplerConfig{
-			Type:  jaeger.SamplerTypeConst,
-			Param: 1,
-		},
+
 		Reporter: &config.ReporterConfig{
 			LogSpans:           true,
 			LocalAgentHostPort: fmt.Sprintf("%s:%d", config2.EnvCfg.JaegerHost, config2.EnvCfg.JaegerPort),
 		},
 		ServiceName: serverName,
 	}
+	sample := &config.SamplerConfig{
+		Type:  jaeger.SamplerTypeConst,
+		Param: 1,
+	}
+	if config2.EnvCfg.ProjectMode == "prod" {
+		sample.Type = jaeger.SamplerTypeRemote
+		sample.SamplingRefreshInterval = 60 * 1000
+	}
+	cfg.Sampler = sample
 	return cfg
 }
 

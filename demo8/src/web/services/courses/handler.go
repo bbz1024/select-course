@@ -4,17 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/dtm-labs/client/dtmcli"
-	"github.com/dtm-labs/client/dtmgrpc/dtmgimp"
-	"github.com/dtm-labs/client/workflow"
+	"github.com/dtm-labs/client/dtmgrpc"
 	"github.com/gin-gonic/gin"
 	"github.com/lithammer/shortuuid/v3"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"net/http"
 	grpc2 "select-course/demo7/src/utils/grpc"
 	"select-course/demo8/src/constant/code"
+	"select-course/demo8/src/constant/config"
 	"select-course/demo8/src/constant/services"
 	"select-course/demo8/src/models/request"
 	"select-course/demo8/src/rpc/course"
@@ -90,7 +88,6 @@ func MyCourseList(ctx *gin.Context) {
 		},
 	)
 }
-
 func SelectCourse(ctx *gin.Context) {
 	// tracing
 	span := tracing.StartSpan(ctx, "SelectCourse")
@@ -114,89 +111,55 @@ func SelectCourse(ctx *gin.Context) {
 		resp.Fail(ctx, code.CourseNotFound, code.CourseNotFoundMsg)
 		return
 	}
-
 	// call grpc by transaction
-	// register workflow transaction
-	rpcServer := grpc.NewServer(grpc.UnaryInterceptor(dtmgimp.GrpcServerLog))
-	const GrpcAddr = "localhost:10001"
-	const DTMAddr = "localhost:36790"
-	workflow.InitGrpc(DTMAddr, GrpcAddr, rpcServer)
-	var res *course.CourseOptResponse
-	err := workflow.Register(services.CourseRpcServerName, func(wf *workflow.Workflow, data []byte) error {
-		// 预扣减容量
-		// tackle rollback
-		var body course.CourseOptRequest
-		if err := proto.Unmarshal(data, &body); err != nil {
-			logger.Error("json unmarshal", zap.Error(err))
-			tracing.RecordError(span, err)
+	courseGrpcAddr := fmt.Sprintf("%s%s", config.EnvCfg.BaseHost, services.CourseRpcServerAddr)
+	dtmAddr := fmt.Sprintf("%s:%d", config.EnvCfg.DtmHost, config.EnvCfg.DtmPort)
+	logger.Info("transaction start")
+	var res = &course.CourseOptResponse{}
+	err := dtmgrpc.TccGlobalTransaction(dtmAddr, shortuuid.New(), func(tcc *dtmgrpc.TccGrpc) error {
+		r := &emptypb.Empty{}
+		if err := tcc.CallBranch(
+			&course.CourseOptRequest{
+				UserId:   int64(req.UserID),
+				CourseId: int64(req.CourseID),
+			},
+			courseGrpcAddr+"/course.CourseService/TryTryDeductCourse",
+			courseGrpcAddr+"/course.CourseService/TryConfirmDeductCourse",
+			courseGrpcAddr+"/course.CourseService/TryCancelDeductCourse",
+			r,
+		); err != nil {
 			return err
 		}
-		wf.NewBranch().OnRollback(func(bb *dtmcli.BranchBarrier) error {
-			if _, err := courseClient.BackCourse(wf.Context, &body); err != nil {
-				logger.Error("rollback", zap.Error(err))
-				return err
-			}
-			return nil
-		})
-		var err error
-		res, err = courseClient.SelectCourse(wf.Context, &body)
-		if err != nil {
-			logger.Error("SelectCourse", zap.Error(err))
-			tracing.RecordError(span, err)
-			return err
-		}
-		// 异步提交消息，是否提交成功（消息队列是否落库）
-		res, err = courseClient.EnQueueCourse(wf.Context, &course.EnQueueCourseRequest{
-			UserId: int64(req.UserID), CourseId: int64(req.CourseID),
-			CreateAt: res.CreateAt, IsSelect: true,
-		})
-		if err != nil {
-			logger.Error("EnQueueCourse", zap.Error(err))
-			// 回滚事务
+		fmt.Println(r)
+
+		if err := tcc.CallBranch(&course.EnQueueCourseRequest{
+			CreateAt: res.CreateAt,
+			UserId:   int64(req.UserID),
+			CourseId: int64(req.CourseID),
+			IsSelect: true,
+		},
+			courseGrpcAddr+"/course.CourseService/TryTryEnqueueMessage",
+			courseGrpcAddr+"/course.CourseService/TryConfirmEnqueueMessage",
+			courseGrpcAddr+"/course.CourseService/TryCancelEnqueueMessage",
+			res,
+		); err != nil {
 			return err
 		}
 		return nil
 	})
-	if err != nil {
-		tracing.RecordError(span, err)
+
+	fmt.Println(err)
+	if err != nil && !errors.Is(err, code.AbortedError) {
 		logFiled = append(logFiled, zap.Error(err))
-		logger.Error("SelectCourse", logFiled...)
-		resp.Fail(ctx, code.Fail, code.FailMsg)
-		return
-	}
-	data, err := proto.Marshal(&course.CourseOptRequest{
-		UserId: int64(req.UserID), CourseId: int64(req.CourseID),
-	})
-	if err != nil {
+		logger.Error("tcc error", logFiled...)
 		tracing.RecordError(span, err)
-		logFiled = append(logFiled, zap.Error(err))
-		logger.Error("SelectCourse", logFiled...)
-		resp.Fail(ctx, code.Fail, code.FailMsg)
-		return
 	}
-	_, err = workflow.ExecuteCtx(ctx.Request.Context(), services.CourseRpcServerName, shortuuid.New(), data)
-	if err != nil {
-		tracing.RecordError(span, err)
-		logFiled = append(logFiled, zap.Error(err))
-		// rollback
-		if errors.Is(err, dtmcli.ErrFailure) {
-			logger.Error("rollback", logFiled...)
-			ctx.Render(http.StatusOK, resp.CustomJSON{
-				Data:    res,
-				Context: ctx,
-			})
-			return
-		}
-		logger.Error("SelectCourse", logFiled...)
-		resp.Fail(ctx, code.Fail, code.FailMsg)
-		return
-	}
+	logger.Info("transaction end")
 	ctx.Render(http.StatusOK, resp.CustomJSON{
-		Data:    res,
+		Data:    nil,
 		Context: ctx,
 	})
 }
-
 func BackCourse(ctx *gin.Context) {
 	// tracing
 	span := tracing.StartSpan(ctx, "BackCourse")
@@ -226,8 +189,9 @@ func BackCourse(ctx *gin.Context) {
 			UserId: int64(req.UserID), CourseId: int64(req.CourseID),
 		},
 	)
-	if err != nil {
+	if err != nil && !errors.Is(err, code.AbortedError) {
 		logFiled = append(logFiled, zap.Error(err))
+
 		logger.Error("BackCourse", logFiled...)
 		tracing.RecordError(span, err)
 	}

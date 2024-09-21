@@ -1,5 +1,6 @@
 syntax = "proto3";
-option go_package = "./src/rpc/user;user";
+package user;
+option go_package = "./src/rpc/user";
 message UserRequest {
   int64 user_id = 1;
 }

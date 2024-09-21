@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"github.com/dtm-labs/client/workflow"
 	grpc_opentracing "github.com/grpc-ecosystem/go-grpc-middleware/tracing/opentracing"
 	_ "github.com/mbobakov/grpc-consul-resolver"
 	"github.com/opentracing/opentracing-go"
@@ -37,8 +36,6 @@ func Dial(addr string) (*grpc.ClientConn, error) {
 			otelgrpc.UnaryClientInterceptor(),
 			//注入trace
 			grpc_opentracing.UnaryClientInterceptor(),
-
-			workflow.Interceptor, //注入workflow
 		),
 	)
 }

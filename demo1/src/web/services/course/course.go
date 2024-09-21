@@ -12,7 +12,6 @@ import (
 	"select-course/demo1/src/storage/database"
 	"select-course/demo1/src/utils/logger"
 	"select-course/demo1/src/utils/resp"
-	"time"
 )
 
 func GetCourseList(ctx *gin.Context) {
@@ -48,7 +47,6 @@ func SelectCourse(ctx *gin.Context) {
 				resp.Fail(ctx, code.NotFound, code.UserNotFound, code.UserNotFoundMsg)
 			}
 		}
-		time.Sleep(time.Second * 50)
 
 		// 2.2 检查课程是否存在和库存
 		var course models.Course

@@ -1,5 +1,11 @@
 package code
 
+import (
+	"github.com/dtm-labs/client/dtmcli"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
 const (
 	Success  int = 200
 	ParamErr     = 400
@@ -29,6 +35,9 @@ const (
 	CircuitBreakerTrigger = 4000
 	LimitTrigger          = 5000
 )
+
+var AbortedError = status.New(codes.Aborted, dtmcli.ResultFailure).Err()
+
 const (
 	// base
 

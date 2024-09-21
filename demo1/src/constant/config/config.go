@@ -26,8 +26,9 @@ type envConfig struct {
 	MysqlMaxOpenConns int    `env:"MysqlMaxOpenConns" envDefault:"100"`
 }
 
-// var path = "../../.env.dev"
-var path = "demo1/.env.dev"
+//var path = "../../.env.dev"
+
+var path = "./demo1/.env.dev"
 
 // ../../.env.dev
 func init() {

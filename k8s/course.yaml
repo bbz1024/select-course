@@ -1,0 +1,58 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: course-service
+  namespace: select-course
+  labels:
+    app: course-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: course-service
+  template:
+    metadata:
+      name: course-service
+      labels:
+        app: course-service
+    spec:
+      containers:
+        - name: course-service
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService"]
+          ports:
+            - containerPort: 10001
+              protocol: TCP
+          volumeMounts:
+            - name: project-etc-volume
+              mountPath: /project/etc
+            - name: project-logs-volume
+              mountPath: /project/logs
+      imagePullSecrets:
+        - name: harborsecret
+      volumes:
+        - name: project-etc-volume
+          hostPath:
+            path: /data/etc
+            type: DirectoryOrCreate
+        - name: project-logs-volume
+          hostPath:
+            path: /data/logs
+            type: DirectoryOrCreate
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: course-svc
+  namespace: select-course
+spec:
+  selector:
+    app: course-service
+  ports:
+    - port: 10001
+      targetPort: 10001
+      protocol: TCP
+  type: ClusterIP

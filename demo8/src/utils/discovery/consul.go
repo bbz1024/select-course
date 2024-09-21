@@ -45,18 +45,20 @@ func (c *ConsulDiscovery) Register(ctx context.Context, service Service) error {
 		Address: config2.EnvCfg.BaseHost,
 		Port:    parsePort,
 		// Http检查
-
 	}
-	if config2.EnvCfg.ProjectMode == "prod" {
-		reg.Check = &capi.AgentServiceCheck{
-			Interval:                       "5s",
-			Timeout:                        "5s",
-			GRPC:                           fmt.Sprintf("%s:%d", config2.EnvCfg.BaseHost, parsePort),
-			GRPCUseTLS:                     false,
-			DeregisterCriticalServiceAfter: "30s", // 30s
+	/*
+		关闭心跳检查
+		if config2.EnvCfg.ProjectMode == "prod" {
+			reg.Check = &capi.AgentServiceCheck{
+				Interval:                       "5s",
+				Timeout:                        "5s",
+				GRPC:                           fmt.Sprintf("%s:%d", config2.EnvCfg.BaseHost, parsePort),
+				GRPCUseTLS:                     false,
+				DeregisterCriticalServiceAfter: "30s", // 30s
+			}
 		}
 
-	}
+	*/
 	if err := c.client.Agent().ServiceRegister(reg); err != nil {
 		return err
 	}

@@ -1,5 +1,6 @@
 syntax = "proto3";
-option go_package = "./src/rpc/course;course";
+package course;
+option go_package = "./src/rpc/course";
 
 // 课程信息消息类型
 message Course{
@@ -72,4 +73,15 @@ service CourseService{
   // 其中选课操作和退课操作都存在在redis预创建，如何丢入到消息队列进行处理操作，消息队列处理操作为：扣减课程，修改用户课程表，添加用户选课记录操作。
   // 丢入消息队列操作
   rpc EnQueueCourse(EnQueueCourseRequest) returns (CourseOptResponse) {}
+
+  //  1. 定义TCC事务的Try、Confirm和Cancel方法
+  rpc TryTryDeductCourse(CourseOptRequest) returns (CourseOptResponse) {}
+  rpc TryConfirmDeductCourse(CourseOptRequest) returns (CourseOptResponse) {}
+  rpc TryCancelDeductCourse(CourseOptRequest) returns (CourseOptResponse) {}
+
+  rpc TryTryEnqueueMessage(EnQueueCourseRequest) returns (CourseOptResponse) {}
+  rpc TryConfirmEnqueueMessage(EnQueueCourseRequest) returns (CourseOptResponse) {}
+  rpc TryCancelEnqueueMessage(EnQueueCourseRequest) returns (CourseOptResponse) {}
+
+
 }

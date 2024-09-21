@@ -8,7 +8,7 @@ if [ -d "output" ]; then
 fi
 
 mkdir -p /build/output/services
-cd /build/demo6/src || exit
+cd /build/demo8/src || exit
 # build gateway
 
 go build -o /build/output/app

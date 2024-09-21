@@ -59,8 +59,8 @@ type envConfig struct {
 
 	// dtm
 
-	DtmHost string `env:"DTM_HOST" envDefault:""`
-	DtmPort string `env:"DTM_PORT" envDefault:""`
+	DtmHost string `env:"DTM_HOST" envDefault:"localhost"`
+	DtmPort int    `env:"DTM_PORT" envDefault:"36790"`
 }
 
 var path = ".env.dev"

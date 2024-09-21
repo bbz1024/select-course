@@ -12,7 +12,7 @@ RUN go mod tidy
 RUN bash ./scripts/build-all.sh
 # 多阶构建。
 
-FROM alpine:latest
+FROM alpine:3.19
 
 ENV TZ Asia/Shanghai
 
@@ -23,4 +23,11 @@ COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 COPY --from=builder  /build/output .
 COPY --from=builder  /build/.env .
 COPY --from=builder  /build/sentinel.yml .
+
+# app
+# services
+#   users
+#   course
+# .env
+# sentinel.yml
 #CMD ["./app"]

@@ -50,22 +50,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-  nginx:
-    image:  nginx:1.19.0-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.balancer.conf:/etc/nginx/nginx.conf
-      #      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./logs/nginx:/var/log/nginx
-    networks:
-      - Course
-    depends_on:
-      app1:
-        condition: service_started
-      app2:
-        condition: service_started
   jaeger:
     image: jaegertracing/all-in-one
     environment:
@@ -104,160 +88,177 @@ services:
       retries: 3
     networks:
       - Course
-  prometheus:
-    image: bitnami/prometheus:latest
-    volumes:
-      - ./prometheus.yml:/opt/bitnami/prometheus/conf/prometheus.yml
-    ports:
-      - "9090:9090"
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
-      #热加载配置
-      - '--web.enable-lifecycle'
-      #api配置
-      #- '--web.enable-admin-api'
-      #历史数据最大保留时间，默认15天
-      - '--storage.tsdb.retention.time=30d'
-  grafana:
-    image: grafana/grafana
-    environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
-      - GF_AUTH_DISABLE_LOGIN_FORM=true
-    ports:
-      - "3000:3000"
-  # 分布式事务状态机
-  #  dtm:
-  #    image: yedf/dtm:latest
-  #    restart: unless-stopped
-  #    ports:
-  #      - "36789:36789"
-  #      - "36790:36790"
-  #    volumes:
-  #      - ./dtm.conf.yml:/app/dtm/dtm.conf.yml
-  #    command: [ "-c", "dtm.conf.yml" ]
-  user:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "10000:10000" #本地:容器
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
-    depends_on:
-      jaeger:
-        condition: service_healthy
-      consul:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-  course:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "10001:10001"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
-    depends_on:
-      jaeger:
-        condition: service_healthy
-      consul:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-  course2:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "10002:10001"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
-    depends_on:
-      jaeger:
-        condition: service_healthy
-      consul:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-  app1:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "8888:8888"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-    depends_on:
-      jaeger:
-        condition: service_healthy
-      consul:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      course:
-        condition: service_started
-      user:
-        condition: service_started
-  app2:
-    image: select-course
-    restart: unless-stopped
-    ports:
-      - "8889:8888"
-    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
-    env_file:
-      - .env
-    networks:
-      - Course
-    volumes:
-      - ./logs:/project/logs
-    depends_on:
-      jaeger:
-        condition: service_healthy
-      consul:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      course:
-        condition: service_started
-      user:
-        condition: service_started
+#  prometheus:
+#    image: bitnami/prometheus:latest
+#    volumes:
+#      - ./prometheus.yml:/opt/bitnami/prometheus/conf/prometheus.yml
+#    ports:
+#      - "9090:9090"
+#    command:
+#      - '--config.file=/etc/prometheus/prometheus.yml'
+#      - '--storage.tsdb.path=/prometheus'
+#      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+#      - '--web.console.templates=/usr/share/prometheus/consoles'
+#      #热加载配置
+#      - '--web.enable-lifecycle'
+#      #api配置
+#      #- '--web.enable-admin-api'
+#      #历史数据最大保留时间，默认15天
+#      - '--storage.tsdb.retention.time=30d'
+#  grafana:
+#    image: grafana/grafana
+#    environment:
+#      - GF_AUTH_ANONYMOUS_ENABLED=true
+#      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+#      - GF_AUTH_DISABLE_LOGIN_FORM=true
+#    ports:
+#      - "3000:3000"
+#  dtm:
+#    image: yedf/dtm:latest
+#    restart: unless-stopped
+#    ports:
+#      - "36789:36789"
+#      - "36790:36790"
+#    volumes:
+#      - ./dtm.conf.yml:/app/dtm/dtm.conf.yml
+#    command: [ "-c", "dtm.conf.yml" ]
+#    networks:
+#      - Course
+#  nginx:
+#    image:  nginx:1.19.0-alpine
+#    restart: unless-stopped
+#    ports:
+#      - "80:80"
+#    volumes:
+#      - ./nginx.balancer.conf:/etc/nginx/nginx.conf
+#      #      - ./nginx.conf:/etc/nginx/nginx.conf
+#      - ./logs/nginx:/var/log/nginx
+#    networks:
+#      - Course
+#    depends_on:
+#      app1:
+#        condition: service_started
+#      app2:
+#        condition: service_started
+#  user:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "10000:10000" #本地:容器
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
+#    depends_on:
+#      jaeger:
+#        condition: service_healthy
+#      consul:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      mysql:
+#        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#  course:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "10001:10001"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
+#    depends_on:
+#      jaeger:
+#        condition: service_healthy
+#      consul:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      mysql:
+#        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#  course2:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "10002:10001"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
+#    depends_on:
+#      jaeger:
+#        condition: service_healthy
+#      consul:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      mysql:
+#        condition: service_healthy
+#      rabbitmq:
+#        condition: service_healthy
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#  app1:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "8888:8888"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#    depends_on:
+#      jaeger:
+#        condition: service_healthy
+#      consul:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      mysql:
+#        condition: service_healthy
+#      course:
+#        condition: service_started
+#      user:
+#        condition: service_started
+#  app2:
+#    image: select-course
+#    restart: unless-stopped
+#    ports:
+#      - "8889:8888"
+#    command: [ "sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
+#    env_file:
+#      - .env
+#    networks:
+#      - Course
+#    volumes:
+#      - ./logs:/project/logs
+#    depends_on:
+#      jaeger:
+#        condition: service_healthy
+#      consul:
+#        condition: service_healthy
+#      redis:
+#        condition: service_healthy
+#      mysql:
+#        condition: service_healthy
+#      course:
+#        condition: service_started
+#      user:
+#        condition: service_started
 networks:
   Course:
     driver: bridge

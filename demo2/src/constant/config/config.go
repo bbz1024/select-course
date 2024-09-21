@@ -34,9 +34,9 @@ type envConfig struct {
 	RedisMaxActiveConns int    `env:"RedisMaxActiveConns" envDefault:"100"`
 }
 
-//var path = "../../.env.dev"
+var path = "../../.env.dev"
 
-var path = "demo2/.env.dev"
+//var path = "demo2/.env.dev"
 
 func init() {
 

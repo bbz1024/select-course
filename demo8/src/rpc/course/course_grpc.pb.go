@@ -19,11 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion8
 
 const (
-	CourseService_GetAllCourses_FullMethodName = "/CourseService/GetAllCourses"
-	CourseService_GetMyCourses_FullMethodName  = "/CourseService/GetMyCourses"
-	CourseService_SelectCourse_FullMethodName  = "/CourseService/SelectCourse"
-	CourseService_BackCourse_FullMethodName    = "/CourseService/BackCourse"
-	CourseService_EnQueueCourse_FullMethodName = "/CourseService/EnQueueCourse"
+	CourseService_GetAllCourses_FullMethodName            = "/course.CourseService/GetAllCourses"
+	CourseService_GetMyCourses_FullMethodName             = "/course.CourseService/GetMyCourses"
+	CourseService_SelectCourse_FullMethodName             = "/course.CourseService/SelectCourse"
+	CourseService_BackCourse_FullMethodName               = "/course.CourseService/BackCourse"
+	CourseService_EnQueueCourse_FullMethodName            = "/course.CourseService/EnQueueCourse"
+	CourseService_TryTryDeductCourse_FullMethodName       = "/course.CourseService/TryTryDeductCourse"
+	CourseService_TryConfirmDeductCourse_FullMethodName   = "/course.CourseService/TryConfirmDeductCourse"
+	CourseService_TryCancelDeductCourse_FullMethodName    = "/course.CourseService/TryCancelDeductCourse"
+	CourseService_TryTryEnqueueMessage_FullMethodName     = "/course.CourseService/TryTryEnqueueMessage"
+	CourseService_TryConfirmEnqueueMessage_FullMethodName = "/course.CourseService/TryConfirmEnqueueMessage"
+	CourseService_TryCancelEnqueueMessage_FullMethodName  = "/course.CourseService/TryCancelEnqueueMessage"
 )
 
 // CourseServiceClient is the client API for CourseService service.
@@ -41,6 +47,13 @@ type CourseServiceClient interface {
 	// 其中选课操作和退课操作都存在在redis预创建，如何丢入到消息队列进行处理操作，消息队列处理操作为：扣减课程，修改用户课程表，添加用户选课记录操作。
 	// 丢入消息队列操作
 	EnQueueCourse(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	// 1. 定义TCC事务的Try、Confirm和Cancel方法
+	TryTryDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	TryConfirmDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	TryCancelDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	TryTryEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	TryConfirmEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
+	TryCancelEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error)
 }
 
 type courseServiceClient struct {
@@ -101,6 +114,66 @@ func (c *courseServiceClient) EnQueueCourse(ctx context.Context, in *EnQueueCour
 	return out, nil
 }
 
+func (c *courseServiceClient) TryTryDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryTryDeductCourse_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *courseServiceClient) TryConfirmDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryConfirmDeductCourse_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *courseServiceClient) TryCancelDeductCourse(ctx context.Context, in *CourseOptRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryCancelDeductCourse_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *courseServiceClient) TryTryEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryTryEnqueueMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *courseServiceClient) TryConfirmEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryConfirmEnqueueMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *courseServiceClient) TryCancelEnqueueMessage(ctx context.Context, in *EnQueueCourseRequest, opts ...grpc.CallOption) (*CourseOptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CourseOptResponse)
+	err := c.cc.Invoke(ctx, CourseService_TryCancelEnqueueMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CourseServiceServer is the server API for CourseService service.
 // All implementations must embed UnimplementedCourseServiceServer
 // for forward compatibility
@@ -116,6 +189,13 @@ type CourseServiceServer interface {
 	// 其中选课操作和退课操作都存在在redis预创建，如何丢入到消息队列进行处理操作，消息队列处理操作为：扣减课程，修改用户课程表，添加用户选课记录操作。
 	// 丢入消息队列操作
 	EnQueueCourse(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error)
+	// 1. 定义TCC事务的Try、Confirm和Cancel方法
+	TryTryDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error)
+	TryConfirmDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error)
+	TryCancelDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error)
+	TryTryEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error)
+	TryConfirmEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error)
+	TryCancelEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error)
 	mustEmbedUnimplementedCourseServiceServer()
 }
 
@@ -137,6 +217,24 @@ func (UnimplementedCourseServiceServer) BackCourse(context.Context, *CourseOptRe
 }
 func (UnimplementedCourseServiceServer) EnQueueCourse(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnQueueCourse not implemented")
+}
+func (UnimplementedCourseServiceServer) TryTryDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryTryDeductCourse not implemented")
+}
+func (UnimplementedCourseServiceServer) TryConfirmDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryConfirmDeductCourse not implemented")
+}
+func (UnimplementedCourseServiceServer) TryCancelDeductCourse(context.Context, *CourseOptRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryCancelDeductCourse not implemented")
+}
+func (UnimplementedCourseServiceServer) TryTryEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryTryEnqueueMessage not implemented")
+}
+func (UnimplementedCourseServiceServer) TryConfirmEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryConfirmEnqueueMessage not implemented")
+}
+func (UnimplementedCourseServiceServer) TryCancelEnqueueMessage(context.Context, *EnQueueCourseRequest) (*CourseOptResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TryCancelEnqueueMessage not implemented")
 }
 func (UnimplementedCourseServiceServer) mustEmbedUnimplementedCourseServiceServer() {}
 
@@ -241,11 +339,119 @@ func _CourseService_EnQueueCourse_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CourseService_TryTryDeductCourse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CourseOptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryTryDeductCourse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryTryDeductCourse_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryTryDeductCourse(ctx, req.(*CourseOptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CourseService_TryConfirmDeductCourse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CourseOptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryConfirmDeductCourse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryConfirmDeductCourse_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryConfirmDeductCourse(ctx, req.(*CourseOptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CourseService_TryCancelDeductCourse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CourseOptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryCancelDeductCourse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryCancelDeductCourse_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryCancelDeductCourse(ctx, req.(*CourseOptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CourseService_TryTryEnqueueMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnQueueCourseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryTryEnqueueMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryTryEnqueueMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryTryEnqueueMessage(ctx, req.(*EnQueueCourseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CourseService_TryConfirmEnqueueMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnQueueCourseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryConfirmEnqueueMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryConfirmEnqueueMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryConfirmEnqueueMessage(ctx, req.(*EnQueueCourseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CourseService_TryCancelEnqueueMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnQueueCourseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CourseServiceServer).TryCancelEnqueueMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CourseService_TryCancelEnqueueMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CourseServiceServer).TryCancelEnqueueMessage(ctx, req.(*EnQueueCourseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CourseService_ServiceDesc is the grpc.ServiceDesc for CourseService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var CourseService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "CourseService",
+	ServiceName: "course.CourseService",
 	HandlerType: (*CourseServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -267,6 +473,30 @@ var CourseService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EnQueueCourse",
 			Handler:    _CourseService_EnQueueCourse_Handler,
+		},
+		{
+			MethodName: "TryTryDeductCourse",
+			Handler:    _CourseService_TryTryDeductCourse_Handler,
+		},
+		{
+			MethodName: "TryConfirmDeductCourse",
+			Handler:    _CourseService_TryConfirmDeductCourse_Handler,
+		},
+		{
+			MethodName: "TryCancelDeductCourse",
+			Handler:    _CourseService_TryCancelDeductCourse_Handler,
+		},
+		{
+			MethodName: "TryTryEnqueueMessage",
+			Handler:    _CourseService_TryTryEnqueueMessage_Handler,
+		},
+		{
+			MethodName: "TryConfirmEnqueueMessage",
+			Handler:    _CourseService_TryConfirmEnqueueMessage_Handler,
+		},
+		{
+			MethodName: "TryCancelEnqueueMessage",
+			Handler:    _CourseService_TryCancelEnqueueMessage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

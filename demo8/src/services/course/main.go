@@ -115,10 +115,6 @@ func main() {
 		panic(err)
 	}
 
-	// init dtm transaction
-	// c
-
-	//workflow.InitGrpc(DTMAddr, GrpcAddr, rpcServer)
 	// consul register
 	err = discovery.Consul.Register(
 		context.Background(), discovery.Service{
