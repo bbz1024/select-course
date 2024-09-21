@@ -21,7 +21,6 @@ ENV PROJECT_MODE prod
 
 COPY --from=builder /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 COPY --from=builder  /build/output .
-COPY --from=builder  /build/.env .
 COPY --from=builder  /build/sentinel.yml .
 
 # app

@@ -26,21 +26,24 @@ spec:
             - containerPort: 8888
               protocol: TCP
           volumeMounts:
-            - name: project-etc-volume
-              mountPath: /project/etc
             - name: project-logs-volume
               mountPath: /project/logs
+            - name: config-env
+              mountPath: /project/.env
+              subPath: .env
       imagePullSecrets:
         - name: harborsecret
       volumes:
-        - name: project-etc-volume
-          hostPath:
-            path: /data/etc
-            type: DirectoryOrCreate
         - name: project-logs-volume
           hostPath:
-            path: /data/logs
+            path: /data/select-course/logs
             type: DirectoryOrCreate
+        - name: config-env
+          configMap:
+            name: config-env
+            items:
+              - key: .env
+                path: .env
       restartPolicy: Always
 ---
 apiVersion: v1
@@ -57,3 +60,4 @@ spec:
     - port: 8888
       targetPort: 8888
 
+# kubectl create configmap config-env -n select-course --from-file=./.env

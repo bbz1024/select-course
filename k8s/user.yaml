@@ -26,17 +26,20 @@ spec:
             - containerPort: 10000
               protocol: TCP
           volumeMounts:
-            - name: project-etc-volume
-              mountPath: /project/etc
+            - name: config-env
+              mountPath: /project/.env
+              subPath: .env
             - name: project-logs-volume
               mountPath: /project/logs
       imagePullSecrets:
         - name: harborsecret
       volumes:
-        - name: project-etc-volume
-          hostPath:
-            path: /data/etc
-            type: DirectoryOrCreate
+        - name: config-env
+          configMap:
+            name: config-env
+            items:
+              - key: .env
+                path: .env
         - name: project-logs-volume
           hostPath:
             path: /data/logs
