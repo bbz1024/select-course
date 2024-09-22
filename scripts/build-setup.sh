@@ -37,7 +37,6 @@ find "./k8s" -name "*.yaml" | while read FILE; do
   sed -i "s|BUILD_HASH|${BUILD_HASH}|" "$FILE"
 done
 # load configmap
-kubectl apply configmap config-env -n select-course --from-file=./.env
+#kubectl create configmap config-env -n select-course --from-file=./.env
 kubectl apply -f k8s
 echo "deploy success"
-echo "all done"
