@@ -11,13 +11,12 @@ spec:
   selector:
     matchLabels:
       app: user-service
-
   template:
     metadata:
       name: user-service
       labels:
         app: user-service
-        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
+#        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
     spec:
       containers:
         - name: user-service

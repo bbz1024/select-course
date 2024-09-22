@@ -16,7 +16,7 @@ spec:
       name: gateway
       labels:
         app: gateway
-        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
+#        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
     spec:
       containers:
         - name: gateway
