@@ -13,8 +13,6 @@ BUILD_HASH=${BUILD_NUMBER}-${GIT_COMMIT}
 IMAGE_NAME=select-course:${BUILD_HASH}
 PUSH_IMAGE_NAME=swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_HASH}
 
-
-
 # 构建镜像并使用唯一的标签
 docker build -t  "${IMAGE_NAME}" .
 echo "build success"
@@ -39,7 +37,7 @@ find "./k8s" -name "*.yaml" | while read FILE; do
   sed -i "s|BUILD_HASH|${BUILD_HASH}|" "$FILE"
 done
 # load configmap
-kubectl create configmap config-env -n select-course --from-file=./.env
-kubectl create -f k8s
+kubectl apply configmap config-env -n select-course --from-file=./.env
+kubectl apply -f k8s
 echo "deploy success"
 echo "all done"
