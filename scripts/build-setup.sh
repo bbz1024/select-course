@@ -9,9 +9,12 @@ fi
 echo "starting..."
 # 获取Jenkins构建号（如果在Jenkins环境中）
 BUILD_NUMBER=${BUILD_NUMBER:-"unknown"}
-IMAGE_NAME=select-course:${BUILD_NUMBER}-${GIT_COMMIT}
-PUSH_IMAGE_NAME=swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT}
-
+BUILD_HASH=${BUILD_NUMBER}-${GIT_COMMIT}
+IMAGE_NAME=select-course:${BUILD_HASH}
+PUSH_IMAGE_NAME=swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_HASH}
+# 设置环境变量
+export PUSH_IMAGE_NAME
+export BUILD_HASH
 
 # 构建镜像并使用唯一的标签
 docker build -t  "${IMAGE_NAME}" .
