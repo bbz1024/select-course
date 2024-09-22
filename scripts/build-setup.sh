@@ -32,6 +32,7 @@ echo "clear success"
 # k8 replace
 
 # load configmap
-kubectl replace configmap config-env -n select-course --from-file=./.env
-kubectl replace -f k8s
+kubectl create configmap config-env -n select-course --from-file=./.env
+kubectl create -f k8s
+
 echo "replace success"
