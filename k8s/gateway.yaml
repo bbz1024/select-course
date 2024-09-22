@@ -16,11 +16,11 @@ spec:
       name: gateway
       labels:
         app: gateway
-#        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
+        version: "BUILD_HASH"
     spec:
       containers:
         - name: gateway
-          image: ${PUSH_IMAGE_NAME}
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:latest
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
           ports:

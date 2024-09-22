@@ -16,11 +16,11 @@ spec:
       name: course-service
       labels:
         app: course-service
-#        version: "${BUILD_NUMBER}-${GIT_COMMIT}"  # 添加版本标签
+        version: "BUILD_HASH"
     spec:
       containers:
         - name: course-service
-          image: ${PUSH_IMAGE_NAME}
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:latest
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
           ports:
