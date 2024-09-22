@@ -16,15 +16,16 @@ spec:
       name: course-service
       labels:
         app: course-service
-        version: "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"  # 添加版本标签
+        version: "${BUILD_NUMBER}-${GIT_COMMIT}"  # 添加版本标签
     spec:
       containers:
         - name: course-service
-          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT}
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
           ports:
-            - containerPort: 10001
+            - name: grpc-10001
+              containerPort: 10001
               protocol: TCP
           volumeMounts:
             - name: config-env
@@ -46,17 +47,4 @@ spec:
             path: /data/logs
             type: DirectoryOrCreate
       restartPolicy: Always
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: course-svc
-  namespace: select-course
-spec:
-  selector:
-    app: course-service
-  ports:
-    - port: 10001
-      targetPort: 10001
-      protocol: TCP
-  type: ClusterIP
+      terminationGracePeriodSeconds: 30

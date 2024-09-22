@@ -17,15 +17,16 @@ spec:
       name: user-service
       labels:
         app: user-service
-        version: "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
+        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
     spec:
       containers:
         - name: user-service
-          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT}
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
           ports:
-            - containerPort: 10000
+            - name: grpc-10000
+              containerPort: 10000
               protocol: TCP
           volumeMounts:
             - name: config-env
@@ -47,17 +48,4 @@ spec:
             path: /data/logs
             type: DirectoryOrCreate
       restartPolicy: Always
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: user-svc
-  namespace: select-course
-spec:
-  selector:
-    app: user-service
-  ports:
-    - port: 10000
-      targetPort: 10000
-      protocol: TCP
-  type: ClusterIP
+      terminationGracePeriodSeconds: 30

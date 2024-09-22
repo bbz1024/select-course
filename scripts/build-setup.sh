@@ -7,12 +7,10 @@ fi
 
 # start
 echo "starting..."
-# 获取当前Git提交的前7位
-GIT_COMMIT_SHORT=$(git rev-parse --short HEAD)
 # 获取Jenkins构建号（如果在Jenkins环境中）
 BUILD_NUMBER=${BUILD_NUMBER:-"unknown"}
-IMAGE_NAME=select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
-PUSH_IMAGE_NAME=swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+IMAGE_NAME=select-course:${BUILD_NUMBER}-${GIT_COMMIT}
+PUSH_IMAGE_NAME=swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT}
 
 
 # 构建镜像并使用唯一的标签
@@ -29,5 +27,8 @@ docker rmi -f "${IMAGE_NAME}"
 echo "clear success"
 
 # k8 replace
+
+# load configmap
+kubectl replace configmap config-env -n select-course --from-file=./.env
 kubectl replace -f k8s
 echo "replace success"

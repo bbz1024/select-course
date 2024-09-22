@@ -16,11 +16,11 @@ spec:
       name: gateway
       labels:
         app: gateway
-        version: "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
+        version: "${BUILD_NUMBER}-${GIT_COMMIT}"
     spec:
       containers:
         - name: gateway
-          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT}
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
           ports:
@@ -46,6 +46,7 @@ spec:
               - key: .env
                 path: .env
       restartPolicy: Always
+      terminationGracePeriodSeconds: 30
 ---
 apiVersion: v1
 kind: Service
@@ -59,4 +60,4 @@ spec:
     - port: 8888
       targetPort: 8888
 
-# kubectl create configmap config-env -n select-course --from-file=./.env
+#
