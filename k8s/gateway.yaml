@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:latest
+          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./app" ]
           ports:
