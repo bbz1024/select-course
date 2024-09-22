@@ -16,7 +16,7 @@ spec:
       name: course-service
       labels:
         app: course-service
-        version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}  # 添加版本标签
+        version: "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"  # 添加版本标签
     spec:
       containers:
         - name: course-service

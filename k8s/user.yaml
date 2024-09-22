@@ -17,7 +17,7 @@ spec:
       name: user-service
       labels:
         app: user-service
-        version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+        version: "${BUILD_NUMBER}-${GIT_COMMIT_SHORT}"
     spec:
       containers:
         - name: user-service
