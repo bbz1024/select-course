@@ -38,3 +38,7 @@ fi
 docker rmi -f select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
 
 echo "clear success"
+
+# k8 replace
+kubectl replace -f k8s
+echo "replace success"

@@ -11,17 +11,19 @@ spec:
   selector:
     matchLabels:
       app: course-service
+      version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}  # 添加版本标签
   template:
     metadata:
       name: course-service
       labels:
         app: course-service
+        version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}  # 添加版本标签
     spec:
       containers:
         - name: course-service
           image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService"]
+          command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/course/CourseService" ]
           ports:
             - containerPort: 10001
               protocol: TCP
@@ -54,6 +56,7 @@ metadata:
 spec:
   selector:
     app: course-service
+    version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}  # 更新selector匹配版本标签
   ports:
     - port: 10001
       targetPort: 10001

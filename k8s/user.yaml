@@ -11,17 +11,20 @@ spec:
   selector:
     matchLabels:
       app: user-service
+      version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
+
   template:
     metadata:
       name: user-service
       labels:
         app: user-service
+        version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
     spec:
       containers:
         - name: user-service
           image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService"]
+          command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
           ports:
             - containerPort: 10000
               protocol: TCP
@@ -54,6 +57,7 @@ metadata:
 spec:
   selector:
     app: user-service
+    version: ${BUILD_NUMBER}-${GIT_COMMIT_SHORT}
   ports:
     - port: 10000
       targetPort: 10000
