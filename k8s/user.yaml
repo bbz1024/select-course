@@ -7,7 +7,14 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 1
+  replicas: 2 # 副本数
+  revisionHistoryLimit: 10 # 保留的最大历史版本
+  # 更新策略
+  strategy:
+    rollingUpdate: # 滚动更新
+      maxSurge: 25% # 滚动更新时，更新个数最多可以超过副本数的25%
+      maxUnavailable: 25% # 滚动更新时，表示在所有副本数中多少个副本不可用
+    type: RollingUpdate # 更新策略类型
   selector:
     matchLabels:
       app: user-service

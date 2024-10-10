@@ -4,8 +4,6 @@ kind: Ingress
 metadata:
   name: ingress-nginx
   namespace: select-course
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
@@ -13,7 +11,7 @@ spec:
       http:
         paths:
           - pathType: Prefix
-            path: "/"
+            path: "/api/v1/"
             backend:
               service:
                 name: gateway-svc

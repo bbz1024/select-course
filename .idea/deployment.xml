@@ -1,25 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="192.168.241.128" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeUploading="false">
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="192.168.241.128">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/project/select-course" local="$PROJECT_DIR$" web="" />
-          </mappings>
-          <excludedPaths>
-            <excludedPath local="true" path="$PROJECT_DIR$/.idea" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo1" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo2" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo3" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo4" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo5" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo6" />
-            <excludedPath local="true" path="$PROJECT_DIR$/demo7" />
-          </excludedPaths>
-        </serverdata>
-      </paths>
       <paths name="hw-master">
         <serverdata>
           <mappings>
@@ -32,6 +15,24 @@
           <mappings>
             <mapping deploy="/project/select-course" local="$PROJECT_DIR$" web="/" />
           </mappings>
+        </serverdata>
+      </paths>
+      <paths name="master">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/project/select-course" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/.idea" />
+            <excludedPath local="true" path="$PROJECT_DIR$/assets" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo1" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo2" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo3" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo4" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo5" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo6" />
+            <excludedPath local="true" path="$PROJECT_DIR$/demo8" />
+          </excludedPaths>
         </serverdata>
       </paths>
     </serverData>

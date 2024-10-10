@@ -113,17 +113,7 @@ services:
 #      - GF_AUTH_DISABLE_LOGIN_FORM=true
 #    ports:
 #      - "3000:3000"
-#  dtm:
-#    image: yedf/dtm:latest
-#    restart: unless-stopped
-#    ports:
-#      - "36789:36789"
-#      - "36790:36790"
-#    volumes:
-#      - ./dtm.conf.yml:/app/dtm/dtm.conf.yml
-#    command: [ "-c", "dtm.conf.yml" ]
-#    networks:
-#      - Course
+
 #  nginx:
 #    image:  nginx:1.19.0-alpine
 #    restart: unless-stopped

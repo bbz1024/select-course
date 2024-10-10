@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-env
+  namespace: select-course
+data:
+  .env: |-
+    GOPROXY = "https://goproxy.io,direct"
+    PROJECT_MODE="prod"
+    PROJECT_PORT=8888
+    PROJECT_LOG_LEVEL="WARN"
+    REDIS_HOST='192.168.241.128'
+    REDIS_PORT='6379'
+    REDIS_PASSWORD="lzb200244"
+    RedisDB=0
+    RedisMaxIdleConns=10
+    RedisMaxActiveConns=100
+    MYSQL_ROOT_HOST='192.168.241.128'
+    MYSQL_ROOT_USER='lzb200244'
+    MYSQL_ROOT_PASSWORD='lzb200244'
+    MYSQL_ROOT_PORT=3306
+    MysqlDatabase="select_course"
+    MysqlLogLevel="INFO"
+    MysqlMaxIdleConns="10"
+    MysqlMaxOpenConns="100"
+    RABBITMQ_DEFAULT_HOST="192.168.241.128"
+    RABBITMQ_DEFAULT_PORT=5672
+    RABBITMQ_DEFAULT_USER='admin'
+    RABBITMQ_DEFAULT_PASS='admin'
+    RABBITMQ_DEFAULT_VHOST='/'
+    TZ='Asia/Shanghai'
+    JAEGER_AGENT_HOST="192.168.241.128"
+    JAEGER_AGENT_PORT="6831"
+    CONSUL_HOST="192.168.241.128"
+    CONSUL_PORT="8500"
