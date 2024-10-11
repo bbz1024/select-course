@@ -24,10 +24,12 @@ spec:
       labels:
         app: user-service
         version: "BUILD_HASH"
+      annotations:
+        kubesphere.io/imagepullsecrets: '{"user-service": "harborsecret"}'
     spec:
       containers:
         - name: user-service
-          image: swr.cn-north-4.myhuaweicloud.com/bbz/select-course:latest
+          image: swr.cn-south-1.myhuaweicloud.com/lzb/select-course:latest
           imagePullPolicy: IfNotPresent
           command: [ "/bin/sh", "-c", "export BASE_HOST=`hostname -i` && ./services/user/UserService" ]
           ports:
