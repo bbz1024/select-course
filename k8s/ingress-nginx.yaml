@@ -6,9 +6,7 @@ metadata:
   namespace: select-course
   annotations:
     nginx.ingress.kubernetes.io/service-upstream: 'true'
-    kubernetes.io/ingress.class: "nginx"
 spec:
-  ingressClassName: nginx
   rules:
     - host: nginx.kubernetes-devops.cn
       http:

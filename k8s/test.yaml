@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: select-course
+  annotations:
+    kubesphere.io/isElasticReplicas: 'false'
+    servicemesh.kubesphere.io/enabled: 'true'
+  labels:
+    app: productpage
+    version: v1
+    app.kubernetes.io/version: v1
+    app.kubernetes.io/name: bookinfo
+  name: productpage-v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: productpage
+      version: v1
+      app.kubernetes.io/version: v1
+      app.kubernetes.io/name: bookinfo
+  template:
+    metadata:
+      labels:
+        app: productpage
+        version: v1
+        app.kubernetes.io/version: v1
+        app.kubernetes.io/name: bookinfo
+      annotations:
+        sidecar.istio.io/inject: 'true'
+    spec:
+      containers:
+        - name: productpage
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+            limits:
+              cpu: '1'
+              memory: 1000Mi
+          imagePullPolicy: IfNotPresent
+          image: 'kubesphere/examples-bookinfo-productpage-v1:1.16.2'
+          ports:
+            - name: http-web
+              protocol: TCP
+              containerPort: 9080
+              servicePort: 9080
+      serviceAccount: default
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: select-course
+  labels:
+    app: productpage
+    app.kubernetes.io/version: v1
+    app.kubernetes.io/name: bookinfo
+    version: v1
+  annotations:
+    kubesphere.io/workloadType: Deployment
+    servicemesh.kubesphere.io/enabled: 'true'
+    kubesphere.io/serviceType: statelessservice
+  name: productpage
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  selector:
+    app: productpage
+    app.kubernetes.io/version: v1
+    app.kubernetes.io/name: bookinfo
+  ports:
+    - name: http-web
+      protocol: TCP
+      port: 9080
+      targetPort: 9080
